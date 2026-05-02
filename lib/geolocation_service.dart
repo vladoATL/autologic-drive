@@ -1,25 +1,30 @@
-
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
-import 'package:autologic_drive/location_cache.dart';
-import 'package:autologic_drive/preferences.dart';
 import 'package:wakelock_partial_android/wakelock_partial_android.dart';
+
+import 'location_cache.dart';
+import 'preferences.dart';
+import 'tracking/engine.dart';
+import 'tracking/tracking_engine.dart';
 
 class GeolocationService {
   static Future<void> init() async {
-    await bg.BackgroundGeolocation.ready(Preferences.geolocationConfig(false));
+    await engine.ready(Preferences.trackingConfig(false));
     if (Platform.isAndroid) {
-      await bg.BackgroundGeolocation.registerHeadlessTask(headlessTask);
+      engine.registerHeadlessTask(headlessTask);
     }
-    bg.BackgroundGeolocation.onEnabledChange(onEnabledChange);
-    bg.BackgroundGeolocation.onMotionChange(onMotionChange);
-    bg.BackgroundGeolocation.onHeartbeat(onHeartbeat);
-    bg.BackgroundGeolocation.onLocation(onLocation, (bg.LocationError error) {
+    engine.onEnabledChange(_onEnabledChange);
+    engine.onMotionChange(onMotionChange);
+    engine.onHeartbeat(onHeartbeat);
+    engine.onLocation(onLocation, (error) {
       developer.log('Location error', error: error);
     });
+  }
+
+  static void _onEnabledChange(bool enabled) {
+    onEnabledChange(enabled);
   }
 
   static Future<void> onEnabledChange(bool enabled) async {
@@ -30,7 +35,7 @@ class GeolocationService {
     }
   }
 
-  static Future<void> onMotionChange(bg.Location location) async {
+  static Future<void> onMotionChange(TrackedLocation location) async {
     if (Preferences.instance.getBool(Preferences.wakelock) ?? false) {
       if (location.isMoving) {
         await WakelockPartialAndroid.acquire();
@@ -40,36 +45,41 @@ class GeolocationService {
     }
   }
 
-  static Future<void> onHeartbeat(bg.HeartbeatEvent event) async {
-    await bg.BackgroundGeolocation.getCurrentPosition(samples: 1, persist: true, extras: {'heartbeat': true});
+  static Future<void> onHeartbeat() async {
+    await engine.getCurrentPosition(
+      samples: 1,
+      persist: true,
+      extras: {'heartbeat': true},
+    );
   }
 
-  static Future<void> onLocation(bg.Location location) async {
+  static Future<void> onLocation(TrackedLocation location) async {
     if (_shouldDelete(location)) {
       try {
-        await bg.BackgroundGeolocation.destroyLocation(location.uuid);
-      } catch(error) {
+        await engine.destroyLocation(location.uuid);
+      } catch (error) {
         developer.log('Failed to delete location', error: error);
       }
     } else {
       LocationCache.set(location);
       try {
-        await bg.BackgroundGeolocation.sync();
+        await engine.sync();
       } catch (error) {
         developer.log('Failed to send location', error: error);
       }
     }
   }
 
-  static bool _shouldDelete(bg.Location location) {
+  static bool _shouldDelete(TrackedLocation location) {
     if (!location.isMoving) return false;
-    if (location.extras?.isNotEmpty == true) return false;
+    if (location.extras.isNotEmpty) return false;
 
     final lastLocation = LocationCache.get();
     if (lastLocation == null) return false;
 
     final isHighestAccuracy = Preferences.instance.getString(Preferences.accuracy) == 'highest';
-    final duration = DateTime.parse(location.timestamp).difference(DateTime.parse(lastLocation.timestamp)).inSeconds;
+    final duration =
+        DateTime.parse(location.timestamp).difference(DateTime.parse(lastLocation.timestamp)).inSeconds;
 
     if (!isHighestAccuracy) {
       final fastestInterval = Preferences.instance.getInt(Preferences.fastestInterval);
@@ -86,8 +96,8 @@ class GeolocationService {
       if (intervalFilter > 0 && duration >= intervalFilter) return false;
     }
 
-    if (isHighestAccuracy && lastLocation.heading >= 0 && location.coords.heading > 0) {
-      final angle = (location.coords.heading - lastLocation.heading).abs();
+    if (isHighestAccuracy && lastLocation.heading >= 0 && location.heading > 0) {
+      final angle = (location.heading - lastLocation.heading).abs();
       final angleFilter = Preferences.instance.getInt(Preferences.angle) ?? 0;
       if (angleFilter > 0 && angle >= angleFilter) return false;
     }
@@ -95,13 +105,14 @@ class GeolocationService {
     return true;
   }
 
-  static double _distance(Location from, bg.Location to) {
+  static double _distance(CachedLocation from, TrackedLocation to) {
     const earthRadius = 6371008.8; // meters
-    final dLat = _degToRad(to.coords.latitude - from.latitude);
-    final dLon = _degToRad(to.coords.longitude - from.longitude);
+    final dLat = _degToRad(to.latitude - from.latitude);
+    final dLon = _degToRad(to.longitude - from.longitude);
     final sinLat = sin(dLat / 2);
     final sinLon = sin(dLon / 2);
-    final a = sinLat * sinLat + cos(_degToRad(from.latitude)) * cos(_degToRad(to.coords.latitude)) * sinLon * sinLon;
+    final a = sinLat * sinLat +
+        cos(_degToRad(from.latitude)) * cos(_degToRad(to.latitude)) * sinLon * sinLon;
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadius * c;
   }
@@ -110,16 +121,18 @@ class GeolocationService {
 }
 
 @pragma('vm:entry-point')
-void headlessTask(bg.HeadlessEvent headlessEvent) async {
+Future<void> headlessTask(HeadlessEvent event) async {
   await Preferences.init();
-  switch (headlessEvent.name) {
-    case bg.Event.ENABLEDCHANGE:
-      await GeolocationService.onEnabledChange(headlessEvent.event);
-    case bg.Event.MOTIONCHANGE:
-      await GeolocationService.onMotionChange(headlessEvent.event);
-    case bg.Event.HEARTBEAT:
-      await GeolocationService.onHeartbeat(headlessEvent.event);
-    case bg.Event.LOCATION:
-      await GeolocationService.onLocation(headlessEvent.event);
+  switch (event.type) {
+    case HeadlessEventType.enabledChange:
+      await GeolocationService.onEnabledChange(event.payload as bool);
+    case HeadlessEventType.motionChange:
+      await GeolocationService.onMotionChange(event.payload as TrackedLocation);
+    case HeadlessEventType.heartbeat:
+      await GeolocationService.onHeartbeat();
+    case HeadlessEventType.location:
+      await GeolocationService.onLocation(event.payload as TrackedLocation);
+    case HeadlessEventType.unknown:
+      break;
   }
 }

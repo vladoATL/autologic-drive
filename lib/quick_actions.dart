@@ -3,7 +3,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:quick_actions/quick_actions.dart';
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
+
+import 'tracking/engine.dart';
 
 import 'l10n/app_localizations.dart';
 
@@ -23,12 +24,12 @@ class _QuickActionsInitializerState extends State<QuickActionsInitializer> {
     quickActions.initialize((shortcutType) async {
       switch (shortcutType) {
         case 'start':
-          await bg.BackgroundGeolocation.start();
+          await engine.start();
         case 'stop':
-          await bg.BackgroundGeolocation.stop();
+          await engine.stop();
         case 'sos':
           try {
-            await bg.BackgroundGeolocation.getCurrentPosition(samples: 1, persist: true, extras: {'alarm': 'sos'});
+            await engine.getCurrentPosition(samples: 1, persist: true, extras: {'alarm': 'sos'});
           } catch (error) {
             developer.log('Failed to send alert', error: error);
           }

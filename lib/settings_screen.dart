@@ -2,10 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
 import 'package:autologic_drive/main.dart';
 import 'package:autologic_drive/password_service.dart';
 import 'package:autologic_drive/qr_code_screen.dart';
+import 'package:autologic_drive/tracking/engine.dart';
 import 'package:wakelock_partial_android/wakelock_partial_android.dart';
 
 import 'l10n/app_localizations.dart';
@@ -81,7 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       } else {
         await Preferences.instance.setString(key, result);
       }
-      await bg.BackgroundGeolocation.setConfig(Preferences.geolocationConfig(true));
+      await engine.setConfig(Preferences.trackingConfig(true));
       setState(() {});
     }
   }
@@ -167,7 +167,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     await Preferences.instance.setString(Preferences.url, saved);
-    await bg.BackgroundGeolocation.setConfig(Preferences.geolocationConfig(true));
+    await engine.setConfig(Preferences.trackingConfig(true));
     if (mounted) setState(() {});
   }
 
@@ -207,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
         if (selection is ServerPreset) {
           await Preferences.instance.setString(Preferences.url, selection.url);
-          await bg.BackgroundGeolocation.setConfig(Preferences.geolocationConfig(true));
+          await engine.setConfig(Preferences.trackingConfig(true));
           if (mounted) setState(() {});
         } else if (selection == 'custom') {
           await _editCustomUrl();
@@ -234,7 +234,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
         if (selectedAccuracy != null) {
           await Preferences.instance.setString(Preferences.accuracy, selectedAccuracy);
-          await bg.BackgroundGeolocation.setConfig(Preferences.geolocationConfig(true));
+          await engine.setConfig(Preferences.trackingConfig(true));
           setState(() {});
         }
       },
@@ -284,7 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: Preferences.instance.getBool(Preferences.buffer) ?? true,
               onChanged: (value) async {
                 await Preferences.instance.setBool(Preferences.buffer, value);
-                await bg.BackgroundGeolocation.setConfig(Preferences.geolocationConfig(true));
+                await engine.setConfig(Preferences.trackingConfig(true));
                 setState(() {});
               },
             ),
@@ -295,7 +295,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) async {
                 await Preferences.instance.setBool(Preferences.wakelock, value);
                 if (value) {
-                  final state = await bg.BackgroundGeolocation.state;
+                  final state = await engine.getState();
                   if (state.isMoving == true) {
                     WakelockPartialAndroid.acquire();
                   }
@@ -311,7 +311,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: Preferences.instance.getBool(Preferences.stopDetection) ?? true,
               onChanged: (value) async {
                 await Preferences.instance.setBool(Preferences.stopDetection, value);
-                await bg.BackgroundGeolocation.setConfig(Preferences.geolocationConfig(true));
+                await engine.setConfig(Preferences.trackingConfig(true));
                 setState(() {});
               },
             ),

@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_android/shared_preferences_android.dart';
 
 import 'server_presets.dart';
+import 'tracking/tracking_config.dart';
 
 class Preferences {
   static Future<void>? _initFuture;
@@ -59,75 +59,25 @@ class Preferences {
     }
   }
 
-  static bg.Config geolocationConfig(bool reset) {
-    final isHighestAccuracy = instance.getString(accuracy) == 'highest';
-    final locationUpdateInterval = (instance.getInt(interval) ?? 0) * 1000;
-    final fastestLocationUpdateInterval = (instance.getInt(fastestInterval) ?? 30) * 1000;
-    final heartbeatInterval = instance.getInt(heartbeat) ?? 0;
-    return bg.Config(
+  static TrackingConfig trackingConfig(bool reset) {
+    return TrackingConfig(
       reset: reset,
-      geolocation: bg.GeoConfig(
-        desiredAccuracy: switch (instance.getString(accuracy)) {
-          'highest' => Platform.isIOS ? bg.DesiredAccuracy.navigation : bg.DesiredAccuracy.high,
-          'high' => bg.DesiredAccuracy.high,
-          'low' => bg.DesiredAccuracy.low,
-          _ => bg.DesiredAccuracy.medium,
-        },
-        distanceFilter: isHighestAccuracy ? 0 : instance.getInt(distance)?.toDouble(),
-        locationUpdateInterval: Platform.isAndroid
-            ? (isHighestAccuracy ? 0 : (locationUpdateInterval > 0 ? locationUpdateInterval : null))
-            : null,
-        fastestLocationUpdateInterval: Platform.isAndroid ? (isHighestAccuracy ? 0 : fastestLocationUpdateInterval) : null,
-        disableElasticity: true,
-        pausesLocationUpdatesAutomatically: Platform.isIOS ? !(isHighestAccuracy || instance.getBool(stopDetection) == false) : null,
-        showsBackgroundLocationIndicator: Platform.isIOS ? false : null,
-      ),
-      app: bg.AppConfig(
-        enableHeadless: Platform.isAndroid ? true : null,
-        stopOnTerminate: false,
-        startOnBoot: true,
-        heartbeatInterval: heartbeatInterval > 0 ? heartbeatInterval.toDouble() : null,
-        preventSuspend: Platform.isIOS ? (heartbeatInterval > 0) : null,
-        backgroundPermissionRationale: Platform.isAndroid
-            ? bg.PermissionRationale(
-                title: 'Allow {applicationName} to access this device\'s location in the background',
-                message: 'For reliable tracking, please enable {backgroundPermissionOptionLabel} location access.',
-                positiveAction: 'Change to {backgroundPermissionOptionLabel}',
-                negativeAction: 'Cancel')
-            : null,
-        notification: Platform.isAndroid
-            ? bg.Notification(
-                smallIcon: 'drawable/ic_stat_notify',
-                priority: bg.NotificationPriority.low,
-              )
-            : null,
-      ),
-      http: bg.HttpConfig(
-        autoSync: false,
-        url: _formatUrl(instance.getString(url)),
-        params: {
-          'device_id': instance.getString(id),
-        },
-      ),
-      logger: const bg.LoggerConfig(
-        logLevel: bg.LogLevel.verbose,
-        logMaxDays: 1,
-      ),
-      activity: bg.ActivityConfig(
-        disableStopDetection: instance.getBool(stopDetection) == false,
-      ),
-      persistence: bg.PersistenceConfig(
-        maxRecordsToPersist: instance.getBool(buffer) != false ? -1 : 1,
-        locationTemplate: _locationTemplate(),
-      ),
+      accuracy: switch (instance.getString(accuracy)) {
+        'highest' => TrackingAccuracy.highest,
+        'high' => TrackingAccuracy.high,
+        'low' => TrackingAccuracy.low,
+        _ => TrackingAccuracy.medium,
+      },
+      distanceFilterMeters: instance.getInt(distance),
+      locationUpdateIntervalSeconds: instance.getInt(interval),
+      fastestLocationUpdateIntervalSeconds: instance.getInt(fastestInterval) ?? 30,
+      heartbeatIntervalSeconds: instance.getInt(heartbeat) ?? 0,
+      stopDetection: instance.getBool(stopDetection) ?? true,
+      buffer: instance.getBool(buffer) != false,
+      serverUrl: instance.getString(url),
+      deviceId: instance.getString(id),
+      locationBodyTemplate: _locationTemplate(),
     );
-  }
-
-  static String? _formatUrl(String? url) {
-    if (url == null) return null;
-    final uri = Uri.parse(url);
-    if ((uri.path.isEmpty || uri.path == '') && !url.endsWith('/')) return '$url/';
-    return url;
   }
 
   static String _locationTemplate() {

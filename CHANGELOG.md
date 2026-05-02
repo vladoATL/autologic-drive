@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.2.0 — 2026-05-02
+
+Engine-pluggable tracking architecture. No user-visible behavior change; the
+default engine is still `flutter_background_geolocation`. The point of 0.2.0
+is that swapping to a different SDK in 0.3.0 (planned: `tracelet`, free + Apache 2.0)
+is a one-line change in `lib/tracking/engine.dart`.
+
+### Added
+- `lib/tracking/tracking_engine.dart` — abstract `TrackingEngine` interface and
+  engine-agnostic DTOs (`TrackedLocation`, `TrackingState`, `TrackingProviderState`,
+  `TrackingAuthorizationStatus`, `HeadlessEvent`, `HeadlessEventType`).
+- `lib/tracking/tracking_config.dart` — engine-agnostic `TrackingConfig` with
+  primitive fields (accuracy, distance, intervals, heartbeat, stop detection,
+  buffer, server URL, device id, OsmAnd body template).
+- `lib/tracking/fbg_engine.dart` — `FbgEngine implements TrackingEngine` adapter
+  that wraps `flutter_background_geolocation`. All translation between primitive
+  config and `bg.Config / GeoConfig / AppConfig / HttpConfig / …` lives here.
+- `lib/tracking/engine.dart` — single global `engine` singleton. Swap engines
+  by changing one line.
+
+### Changed
+- `Preferences.geolocationConfig(bool)` → `Preferences.trackingConfig(bool)`,
+  now returns `TrackingConfig` (engine-agnostic) instead of `bg.Config`.
+- `LocationCache` `Location` model renamed to `CachedLocation`; `set()` now
+  takes `TrackedLocation` instead of `bg.Location`.
+- `geolocation_service.dart`, `configuration_service.dart`, `main_screen.dart`,
+  `settings_screen.dart`, `quick_actions.dart`, `status_screen.dart` no longer
+  import `flutter_background_geolocation` directly; they all go through `engine`.
+- Email-log target changed from `support@traccar.org` to `support@starlogic.net`.
+
+### Notes
+- 0.3.0 will add `lib/tracking/tracelet_engine.dart` (Apache 2.0 alternative)
+  plus a custom OsmAnd HTTP layer to replace `flutter_background_geolocation`'s
+  `_locationTemplate` hack. Once it's in, `engine.dart` flips one line and the
+  app no longer needs the $500 transistorsoft license.
+
 ## 0.1.0 — 2026-05-02
 
 Initial fork & rebrand of [`traccar/traccar-client`](https://github.com/traccar/traccar-client) v9.7.18 as **AutoLogic Drive**.

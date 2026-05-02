@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
 
 import 'l10n/app_localizations.dart';
+import 'tracking/engine.dart';
 
 class StatusScreen extends StatefulWidget {
   const StatusScreen({super.key});
@@ -20,10 +20,7 @@ class _StatusScreenState extends State<StatusScreen> {
   }
 
   Future<void> _refreshLogs() async {
-    final logs = await bg.Logger.getLog(bg.SQLQuery(
-      order: bg.SQLQuery.ORDER_DESC,
-      limit: 2000,
-    ));
+    final logs = await engine.getLog();
     setState(() {
       _logs.clear();
       _logs.addAll(logs.split('\n'));
@@ -31,14 +28,11 @@ class _StatusScreenState extends State<StatusScreen> {
   }
 
   Future<void> _emailLogs() async {
-    await bg.Logger.emailLog("support@traccar.org", bg.SQLQuery(
-      order: bg.SQLQuery.ORDER_DESC,
-      limit: 25000,
-    ));
+    await engine.emailLog("support@starlogic.net");
   }
 
   Future<void> _clearLogs() async {
-    await bg.Logger.destroyLog();
+    await engine.destroyLog();
     setState(() => _logs.clear());
   }
 

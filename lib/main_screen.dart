@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:autologic_drive/main.dart';
 import 'package:autologic_drive/password_service.dart';
 import 'package:autologic_drive/preferences.dart';
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
+import 'package:autologic_drive/tracking/engine.dart';
 
 import 'l10n/app_localizations.dart';
 import 'status_screen.dart';
@@ -30,17 +30,17 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _initState() async {
-    final state = await bg.BackgroundGeolocation.state;
+    final state = await engine.getState();
     setState(() {
       trackingEnabled = state.enabled;
       isMoving = state.isMoving;
     });
-    bg.BackgroundGeolocation.onEnabledChange((bool enabled) {
+    engine.onEnabledChange((bool enabled) {
       setState(() {
         trackingEnabled = enabled;
       });
     });
-    bg.BackgroundGeolocation.onMotionChange((bg.Location location) {
+    engine.onMotionChange((location) {
       setState(() {
         isMoving = location.isMoving;
       });
@@ -49,26 +49,24 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _checkBatteryOptimizations(BuildContext context) async {
     try {
-      if (!await bg.DeviceSettings.isIgnoringBatteryOptimizations) {
-        final request = await bg.DeviceSettings.showIgnoreBatteryOptimizations();
-        if (!request.seen && context.mounted) {
-          showDialog(
-            context: context,
-            builder: (_) => AlertDialog(
-              scrollable: true,
-              content: Text(AppLocalizations.of(context)!.optimizationMessage),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    bg.DeviceSettings.show(request);
-                  },
-                  child: Text(AppLocalizations.of(context)!.okButton),
-                ),
-              ],
-            ),
-          );
-        }
+      if (!await engine.isIgnoringBatteryOptimizations()) {
+        if (!context.mounted) return;
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            scrollable: true,
+            content: Text(AppLocalizations.of(context)!.optimizationMessage),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  engine.requestIgnoreBatteryOptimizations();
+                },
+                child: Text(AppLocalizations.of(context)!.okButton),
+              ),
+            ],
+          ),
+        );
       }
     } catch (error) {
       debugPrint(error.toString());
@@ -108,20 +106,18 @@ class _MainScreenState extends State<MainScreen> {
                 if (await PasswordService.authenticate(context) && mounted) {
                   if (value) {
                     try {
-                      await bg.BackgroundGeolocation.start();
+                      await engine.start();
                       if (mounted) {
                         _checkBatteryOptimizations(context);
                       }
                     } on PlatformException catch (error) {
-                        final providerState = await bg.BackgroundGeolocation.providerState;
-                        final isPermissionError = providerState.status == bg.ProviderChangeEvent.AUTHORIZATION_STATUS_DENIED ||
-                          providerState.status == bg.ProviderChangeEvent.AUTHORIZATION_STATUS_RESTRICTED;
+                        final providerState = await engine.getProviderState();
                         if (!mounted) return;
                         messengerKey.currentState?.showSnackBar(
                           SnackBar(
                             content: Text(error.message ?? error.code),
                             duration: const Duration(seconds: 4),
-                            action: isPermissionError
+                            action: providerState.isPermissionDenied
                                 ? SnackBarAction(
                                     label: AppLocalizations.of(context)!.settingsTitle,
                                     onPressed: () => AppSettings.openAppSettings(
@@ -133,7 +129,7 @@ class _MainScreenState extends State<MainScreen> {
                         );
                     }
                   } else {
-                    bg.BackgroundGeolocation.stop();
+                    engine.stop();
                   }
                 }
               },
@@ -145,7 +141,7 @@ class _MainScreenState extends State<MainScreen> {
                 FilledButton.tonal(
                   onPressed: () async {
                     try {
-                      await bg.BackgroundGeolocation.getCurrentPosition(samples: 1, persist: true, extras: {'manual': true});
+                      await engine.getCurrentPosition(samples: 1, persist: true, extras: {'manual': true});
                     } on PlatformException catch (error) {
                       messengerKey.currentState?.showSnackBar(SnackBar(content: Text(error.message ?? error.code)));
                     }
