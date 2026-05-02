@@ -3,13 +3,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
-import 'package:traccar_client/main.dart';
-import 'package:traccar_client/password_service.dart';
-import 'package:traccar_client/qr_code_screen.dart';
+import 'package:autologic_drive/main.dart';
+import 'package:autologic_drive/password_service.dart';
+import 'package:autologic_drive/qr_code_screen.dart';
 import 'package:wakelock_partial_android/wakelock_partial_android.dart';
 
 import 'l10n/app_localizations.dart';
 import 'preferences.dart';
+import 'server_presets.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -132,6 +133,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _editCustomUrl() async {
+    final controller = TextEditingController(
+      text: Preferences.instance.getString(Preferences.url) ?? '',
+    );
+    final errorMessage = AppLocalizations.of(context)!.invalidValue;
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        title: Text(AppLocalizations.of(context)!.urlLabel),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(AppLocalizations.of(context)!.cancelButton),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: Text(AppLocalizations.of(context)!.saveButton),
+          ),
+        ],
+      ),
+    );
+    if (saved == null || saved.isEmpty) return;
+    final uri = Uri.tryParse(saved);
+    if (uri == null || uri.host.isEmpty || !(uri.scheme == 'http' || uri.scheme == 'https')) {
+      messengerKey.currentState?.showSnackBar(SnackBar(content: Text(errorMessage)));
+      return;
+    }
+    await Preferences.instance.setString(Preferences.url, saved);
+    await bg.BackgroundGeolocation.setConfig(Preferences.geolocationConfig(true));
+    if (mounted) setState(() {});
+  }
+
+  Widget _buildUrlListTile() {
+    final currentUrl = Preferences.instance.getString(Preferences.url);
+    final preset = matchPreset(currentUrl);
+    final subtitle = preset != null ? '${preset.name} — ${preset.url}' : (currentUrl ?? '');
+    return ListTile(
+      title: Text(AppLocalizations.of(context)!.urlLabel),
+      subtitle: Text(subtitle),
+      onTap: () async {
+        final selection = await showModalBottomSheet<Object>(
+          context: context,
+          builder: (context) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final p in kServerPresets)
+                  ListTile(
+                    title: Text(p.name),
+                    subtitle: Text(p.url),
+                    trailing: currentUrl == p.url ? const Icon(Icons.check) : null,
+                    onTap: () => Navigator.pop(context, p),
+                  ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: const Text('Custom'),
+                  trailing: matchPreset(currentUrl) == null && currentUrl != null && currentUrl.isNotEmpty
+                      ? const Icon(Icons.check)
+                      : null,
+                  onTap: () => Navigator.pop(context, 'custom'),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (selection is ServerPreset) {
+          await Preferences.instance.setString(Preferences.url, selection.url);
+          await bg.BackgroundGeolocation.setConfig(Preferences.geolocationConfig(true));
+          if (mounted) setState(() {});
+        } else if (selection == 'custom') {
+          await _editCustomUrl();
+        }
+      },
+    );
+  }
+
   Widget _buildAccuracyListTile() {
     final accuracyOptions = ['highest', 'high', 'medium', 'low'];
     return ListTile(
@@ -177,7 +261,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         children: [
           _buildListTile(AppLocalizations.of(context)!.idLabel, Preferences.id, false),
-          _buildListTile(AppLocalizations.of(context)!.urlLabel, Preferences.url, false),
+          _buildUrlListTile(),
           _buildAccuracyListTile(),
           _buildListTile(AppLocalizations.of(context)!.distanceLabel, Preferences.distance, true),
           if (isHighestAccuracy || Platform.isAndroid && distance == 0)

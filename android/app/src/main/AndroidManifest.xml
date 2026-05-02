@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <application
         tools:replace="android:label"
-        android:label="Traccar Client"
+        android:label="AutoLogic Drive"
         android:icon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config">
         <activity
@@ -32,7 +32,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="org.traccar.client"/>
+                <data android:scheme="net.starlogic.autologic.drive"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
@@ -40,10 +40,13 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- flutter_background_geolocation license -->
+        <!-- flutter_background_geolocation license: TODO purchase from https://shop.transistorsoft.com
+             for app_id=net.starlogic.autologic.drive before release build (debug runs in trial mode). -->
+        <!--
         <meta-data
             android:name="com.transistorsoft.locationmanager.license"
-            android:value="eyJhbGciOiJFZERTQSIsImtpZCI6ImVkMjU1MTktbWFpbi12MSJ9.eyJvcyI6ImFuZHJvaWQiLCJhcHBfaWQiOiJvcmcudHJhY2Nhci5jbGllbnQiLCJvcmRlcl9udW1iZXIiOjE0MDgzLCJyZW5ld2FsX3VybCI6Imh0dHBzOi8vc2hvcC50cmFuc2lzdG9yc29mdC5jb20vY2FydC8zMTg3NDM1NjA1MjA3MToxP25vdGU9OTQ2MSIsImN1c3RvbWVyX2lkIjo4NjE1LCJwcm9kdWN0IjoiZmx1dHRlci1iYWNrZ3JvdW5kLWdlb2xvY2F0aW9uIiwia2V5X3ZlcnNpb24iOjEsImFsbG93ZWRfc3VmZml4ZXMiOlsiLmRldiIsIi5kZXZlbG9wbWVudCIsIi5zdGFnaW5nIiwiLnN0YWdlIiwiLnFhIiwiLnVhdCIsIi50ZXN0IiwiLmRlYnVnIl0sIm1heF9idWlsZF9zdGFtcCI6MjAyNjA3MDYsImdyYWNlX2J1aWxkcyI6MCwiZW50aXRsZW1lbnRzIjpbImNvcmUiXSwiaWF0IjoxNzY1NjQyNzI2fQ.ufcC9IUak4MD7lcbB2CXIIaXHzo1xUauHIFcqyC7onBUxFcpcg2LihIk7cJGFsA_FhsHjRfkSzqQFweD1gdiCA" />
+            android:value="REPLACE_WITH_AUTOLOGIC_LICENSE_JWT" />
+        -->
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

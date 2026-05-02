@@ -3,10 +3,9 @@ import 'dart:io';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:traccar_client/main.dart';
-import 'package:traccar_client/password_service.dart';
-import 'package:traccar_client/preferences.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:autologic_drive/main.dart';
+import 'package:autologic_drive/password_service.dart';
+import 'package:autologic_drive/preferences.dart';
 import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
 
 import 'l10n/app_localizations.dart';
@@ -109,7 +108,6 @@ class _MainScreenState extends State<MainScreen> {
                 if (await PasswordService.authenticate(context) && mounted) {
                   if (value) {
                     try {
-                      FirebaseCrashlytics.instance.log('tracking_toggle_start');
                       await bg.BackgroundGeolocation.start();
                       if (mounted) {
                         _checkBatteryOptimizations(context);
@@ -135,7 +133,6 @@ class _MainScreenState extends State<MainScreen> {
                         );
                     }
                   } else {
-                    FirebaseCrashlytics.instance.log('tracking_toggle_stop');
                     bg.BackgroundGeolocation.stop();
                   }
                 }
@@ -211,7 +208,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Traccar Client'),
+        title: const Text('AutoLogic Drive'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

@@ -5,6 +5,8 @@ import 'package:flutter_background_geolocation/flutter_background_geolocation.da
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_android/shared_preferences_android.dart';
 
+import 'server_presets.dart';
+
 class Preferences {
   static Future<void>? _initFuture;
   static late SharedPreferencesWithCache instance;
@@ -47,7 +49,7 @@ class Preferences {
     );
     if (instance.getString(id) == null) {
       await instance.setString(id, (Random().nextInt(90000000) + 10000000).toString());
-      await instance.setString(url, 'http://demo.traccar.org:5055');
+      await instance.setString(url, kAutoLogicServer.url);
       await instance.setString(accuracy, 'medium');
       await instance.setInt(interval, 300);
       await instance.setInt(distance, 75);

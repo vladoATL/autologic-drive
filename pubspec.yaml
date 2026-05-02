@@ -1,7 +1,7 @@
-name: traccar_client
-description: "Traccar Client"
+name: autologic_drive
+description: "AutoLogic Drive — GPS tracker pre vozový park Starlogic AutoLogic."
 publish_to: 'none'
-version: 9.7.18+135
+version: 0.1.0+1
 
 environment:
   sdk: ^3.7.2
@@ -14,12 +14,7 @@ dependencies:
   intl: any
   flutter_background_geolocation: ^5.1.2
   shared_preferences: ^2.5.5
-  firebase_core: ^4.7.0
-  firebase_messaging: ^16.2.0
-  firebase_analytics: ^12.3.0
-  firebase_crashlytics: ^5.2.0
   quick_actions: ^1.1.0
-  rate_my_app: ^2.3.2
   shared_preferences_android: ^2.4.23
   wakelock_partial_android: ^1.0.1
   mobile_scanner: ^7.2.0
@@ -36,3 +31,13 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+
+# Enable once assets/icon/autologic_icon.png is generated from
+# C:\Projects\starlogic-autologic\images\autologic_icon.svg (see CHANGELOG).
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/autologic_icon.png"
+  adaptive_icon_background: "#E8F0FE"
+  adaptive_icon_foreground: "assets/icon/autologic_icon.png"
+  min_sdk_android: 23

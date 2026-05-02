@@ -1,5 +1,5 @@
 import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
-import 'package:traccar_client/preferences.dart';
+import 'package:autologic_drive/preferences.dart';
 
 class Location {
   final String timestamp;
