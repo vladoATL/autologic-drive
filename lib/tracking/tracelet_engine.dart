@@ -247,6 +247,25 @@ tl.Config _buildTlConfig(TrackingConfig c) {
       disableElasticity: true,
       pausesLocationUpdatesAutomatically: Platform.isIOS && !isHighest && c.stopDetection,
       showsBackgroundLocationIndicator: false,
+      // Cap battery drain to ~5% per hour of active tracking. Tracelet
+      // self-tunes accuracy / sampling to stay within this budget. 0.0
+      // disables the budget engine.
+      batteryBudgetPerHour: 5.0,
+      // Let Tracelet adjust GeoConfig dynamically based on speed / activity
+      // (driving → standard sampling; walking → coarser; idle → significant
+      // changes only). Plays nicely with stopDetection.
+      enableAdaptiveMode: true,
+    ),
+    motion: tl.MotionConfig(
+      disableStopDetection: !c.stopDetection,
+      // Treat the device as stationary after 3 minutes of no motion (default
+      // is 5). Shorter window means faster transition to low-power sampling
+      // when stopped at lights / parked.
+      stopTimeout: 3,
+      // Use accelerometer-only motion classification — avoids needing the
+      // ACTIVITY_RECOGNITION runtime permission while still detecting
+      // moving↔stationary transitions reliably.
+      disableMotionActivityUpdates: true,
     ),
     app: tl.AppConfig(
       stopOnTerminate: false,
@@ -260,9 +279,6 @@ tl.Config _buildTlConfig(TrackingConfig c) {
         notificationText: 'Zaznamenávam jazdu',
         notificationSmallIcon: 'drawable/ic_stat_notify',
       ),
-    ),
-    motion: tl.MotionConfig(
-      disableStopDetection: !c.stopDetection,
     ),
     persistence: tl.PersistenceConfig(
       maxRecordsToPersist: c.buffer ? -1 : 1,

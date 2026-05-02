@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.9.0 — 2026-05-02
+
+**Kniha jázd** — local trip log with the legally-required fields
+(driver, purpose, business/private, odometer pre/po) so the records
+satisfy Slovak / Czech tax-office requirements.
+
+### Added
+- `lib/trip/trip_record.dart` — `TripRecord` model with all the audit
+  fields and `isComplete` heuristic.
+- `lib/trip/trip_repository.dart` — sqflite-backed CRUD; one row per
+  trip, indexed on `started_at` and `synced`. Schema version 1; future
+  migrations go through `onUpgrade`.
+- `TripController` now creates a `TripRecord` on `.start()` (capturing
+  the start GPS fix from `LocationCache`) and stamps `endedAt` /
+  `endLat,endLng` on `.stop()`. `activeRecordId` is exposed so
+  notification deep links land on the right trip.
+- `lib/screens/trip_detail_screen.dart` — edit screen for one trip:
+  driver, purpose (with 6 preset chips), business/private toggle,
+  odometer pre/po (manual int input — OCR is queued for 0.9.1), delete.
+- `lib/screens/trips_screen.dart` — *Kniha jázd* drawer entry. List of
+  all trips sorted newest-first, status badges (Aktívne / Nevyplnené /
+  Vyplnené), filter chips (Všetky / Nevyplnené / Tento mesiac), and
+  *Exportovať tento mesiac (CSV)* in the overflow menu.
+- `lib/util/trip_csv_exporter.dart` — semicolon-CSV with UTF-8 BOM
+  so Excel preserves diacritics. Columns match a typical kniha jázd
+  layout. Goes through the OS share sheet via `share_plus`.
+- Trip-lifecycle notifications now carry the trip ID as payload and
+  deep-link to `TripDetailScreen` on tap; copy nudges the driver to
+  fill the missing fields ("doplň tacho pred odjazdom" / "doplň účel
+  a tacho po jazde").
+- `Preferences.driverName` is captured from the Traccar `/api/session`
+  response on every login and used as the default driver name on new
+  trips. Per-trip override is editable in `TripDetailScreen`.
+
+### Dependencies
+- `sqflite ^2.3.3`, `path ^1.9.0`, `uuid ^4.5.1`, `share_plus ^10.0.0`,
+  `path_provider ^2.1.4`.
+
+### Notes
+- **OCR for tachometer** is the only piece of the original 0.9.0 scope
+  not yet implemented; manual integer input works fine and OCR will
+  ship as 0.9.1 (Google ML Kit Text Recognition).
+- **Backend sync** is deferred to 0.10+ once the custom backend exists.
+  The persistence layer already has a `synced` flag so adding a sync
+  worker later won't require a schema change.
+
 ## 0.8.1 — 2026-05-02
 
 Tracking polish, log hygiene, notification fixes, and a `/simplify` pass.

@@ -16,6 +16,7 @@ import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
 
 final messengerKey = GlobalKey<ScaffoldMessengerState>();
+final navigatorKey = GlobalKey<NavigatorState>();
 
 const _seedColor = Color(0xFF1A1A1A);
 
@@ -37,6 +38,7 @@ void main() async {
   appLocale.value = Locale(
     Preferences.instance.getString(Preferences.language) ?? 'sk',
   );
+  AppNotifications.navigatorKey = navigatorKey;
   // PasswordService.migrate, GeolocationService.init, AppNotifications.init
   // and TripController.restore all read from `Preferences` (already done) but
   // don't depend on each other — run them concurrently to shave cold-start.
@@ -84,6 +86,7 @@ class _MainAppState extends State<MainApp> {
       valueListenable: appLocale,
       builder: (context, locale, _) => MaterialApp(
         scaffoldMessengerKey: messengerKey,
+        navigatorKey: navigatorKey,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: locale,

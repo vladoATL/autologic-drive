@@ -72,6 +72,10 @@ class TraccarApi {
       Preferences.authUserId,
       (body['id'] as num).toInt(),
     );
+    final name = (body['name'] as String?)?.trim();
+    if (name != null && name.isNotEmpty) {
+      await Preferences.instance.setString(Preferences.driverName, name);
+    }
     AppLogger.info('Login OK: $email');
     return body;
   }
@@ -146,5 +150,55 @@ class TraccarApi {
     }
     AppLogger.info('Creating device $uniqueId ($name)');
     return await createDevice(name: name, uniqueId: uniqueId);
+  }
+
+  /// Read the current Traccar-side name of the device with `uniqueId`.
+  /// Returns `null` if not found / not logged in.
+  static Future<String?> fetchDeviceName(String uniqueId) async {
+    if (!isLoggedIn) return null;
+    try {
+      final list = await listMyDevices(uniqueId: uniqueId);
+      if (list.isEmpty) return null;
+      final device = (list.first as Map).cast<String, dynamic>();
+      return device['name'] as String?;
+    } catch (error) {
+      AppLogger.warn('fetchDeviceName error: $error');
+      return null;
+    }
+  }
+
+  /// Rename an already-registered device by `uniqueId`. No-op if the device
+  /// isn't found or the name already matches.
+  static Future<void> renameDevice({
+    required String uniqueId,
+    required String newName,
+  }) async {
+    if (!isLoggedIn) return;
+    try {
+      final list = await listMyDevices(uniqueId: uniqueId);
+      if (list.isEmpty) {
+        AppLogger.warn('renameDevice: device $uniqueId not found');
+        return;
+      }
+      final device = (list.first as Map).cast<String, dynamic>();
+      if (device['name'] == newName) return;
+      device['name'] = newName;
+      final id = device['id'];
+      final url = Uri.parse('$_baseUrl/api/devices/$id');
+      final resp = await http.put(
+        url,
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode(device),
+      );
+      if (resp.statusCode != 200) {
+        AppLogger.warn(
+          'renameDevice failed: HTTP ${resp.statusCode} ${resp.body}',
+        );
+        return;
+      }
+      AppLogger.info('Device $uniqueId renamed to "$newName"');
+    } catch (error) {
+      AppLogger.warn('renameDevice error: $error');
+    }
   }
 }

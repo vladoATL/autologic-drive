@@ -6,8 +6,10 @@ library;
 
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../screens/trip_detail_screen.dart';
 import 'app_logger.dart';
 
 class AppNotifications {
@@ -29,7 +31,10 @@ class AppNotifications {
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('ic_stat_notify'),
     );
-    await _plugin.initialize(settings);
+    await _plugin.initialize(
+      settings,
+      onDidReceiveNotificationResponse: _onTap,
+    );
     if (Platform.isAndroid) {
       const channel = AndroidNotificationChannel(
         _channelId,
@@ -53,6 +58,19 @@ class AppNotifications {
     _initialized = true;
   }
 
+  /// Set by `main.dart` so the notification tap can navigate.
+  static GlobalKey<NavigatorState>? navigatorKey;
+
+  static void _onTap(NotificationResponse response) {
+    final tripId = response.payload;
+    if (tripId == null || tripId.isEmpty) return;
+    final state = navigatorKey?.currentState;
+    if (state == null) return;
+    state.push(MaterialPageRoute(
+      builder: (_) => TripDetailScreen(tripId: tripId),
+    ));
+  }
+
   static Future<bool> _ensureNotificationsAllowed() async {
     if (!Platform.isAndroid) return true;
     final android = _plugin.resolvePlatformSpecificImplementation<
@@ -66,7 +84,10 @@ class AppNotifications {
     return enabled;
   }
 
-  static Future<void> showTripStarted({String? vehicleLabel}) async {
+  static Future<void> showTripStarted({
+    String? vehicleLabel,
+    String? tripId,
+  }) async {
     try {
       await init();
       if (!await _ensureNotificationsAllowed()) return;
@@ -74,8 +95,8 @@ class AppNotifications {
         _tripNotifId,
         'Jazda začala',
         vehicleLabel != null && vehicleLabel.isNotEmpty
-            ? '$vehicleLabel — sledovanie polohy aktívne'
-            : 'Sledovanie polohy aktívne',
+            ? '$vehicleLabel — doplň tacho pred odjazdom'
+            : 'Doplň tacho pred odjazdom',
         const NotificationDetails(
           android: AndroidNotificationDetails(
             _channelId,
@@ -87,6 +108,7 @@ class AppNotifications {
             autoCancel: true,
           ),
         ),
+        payload: tripId,
       );
     } catch (error) {
       AppLogger.warn('Trip-start notification failed: $error');
@@ -96,6 +118,7 @@ class AppNotifications {
   static Future<void> showTripStopped({
     String? vehicleLabel,
     Duration? duration,
+    String? tripId,
   }) async {
     try {
       await init();
@@ -103,7 +126,9 @@ class AppNotifications {
       final parts = <String>[];
       if (vehicleLabel != null && vehicleLabel.isNotEmpty) parts.add(vehicleLabel);
       if (duration != null) parts.add(_formatDuration(duration));
-      final body = parts.isEmpty ? 'Sledovanie ukončené' : parts.join(' · ');
+      final body = parts.isEmpty
+          ? 'Doplň účel a tacho po jazde'
+          : '${parts.join(' · ')} — doplň účel a tacho';
       await _plugin.show(
         _tripNotifId,
         'Jazda ukončená',
@@ -119,6 +144,7 @@ class AppNotifications {
             autoCancel: true,
           ),
         ),
+        payload: tripId,
       );
     } catch (error) {
       AppLogger.warn('Trip-stop notification failed: $error');

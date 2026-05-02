@@ -9,6 +9,7 @@ import 'package:autologic_drive/preferences.dart';
 import 'package:autologic_drive/tracking/engine.dart';
 
 import 'l10n/app_localizations.dart';
+import 'screens/trips_screen.dart';
 import 'screens/vehicles_screen.dart';
 import 'settings_screen.dart';
 import 'status_screen.dart';
@@ -45,6 +46,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       // Backstop the broadcast receiver: ask the OS for currently connected
       // BT devices and replay them as connect events.
       BluetoothWatcher.pollNow();
+      // Pick up admin-side renames done in the Traccar web UI.
+      VehicleRepository.pullDeviceNameFromServer();
     }
   }
 
@@ -284,6 +287,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                       ),
                 ),
               ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.menu_book),
+              title: Text(loc.tripsTitle),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TripsScreen()),
+                );
+              },
             ),
             ListTile(
               leading: const Icon(Icons.directions_car),

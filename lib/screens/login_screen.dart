@@ -14,6 +14,7 @@ import '../auth/traccar_api.dart';
 import '../configuration_service.dart';
 import '../l10n/app_localizations.dart';
 import '../preferences.dart';
+import '../trip/vehicle_repository.dart';
 import '../util/app_logger.dart';
 import 'qr_scan_screen.dart';
 
@@ -117,9 +118,16 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _registerDevice() async {
     final uniqueId = Preferences.instance.getString(Preferences.id);
     if (uniqueId == null) return;
+    // First-login default; superseded by the primary vehicle label as soon
+    // as the driver pairs a vehicle (VehicleRepository.upsert pushes that
+    // name to Traccar) or by an admin rename on the server (pulled below).
     final name = 'Drive · ${Platform.operatingSystem}';
     try {
       await TraccarApi.ensureDevice(name: name, uniqueId: uniqueId);
+      // If the driver already paired a vehicle in a previous session, push
+      // its label now; if the admin pre-named the device server-side, mirror
+      // that into the local primary vehicle.
+      await VehicleRepository.pullDeviceNameFromServer();
     } catch (error) {
       AppLogger.error('Device auto-registration failed: $error');
     }
