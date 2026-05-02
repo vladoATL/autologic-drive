@@ -31,6 +31,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   late final TextEditingController _odoEndCtrl = TextEditingController();
   TripKind _kind = TripKind.business;
 
+  List<String> _driverSuggestions = const [];
+  bool _odoEndManuallyEdited = false;
+
   static const _purposePresets = <String>[
     'Stretnutie',
     'Servis',
@@ -43,12 +46,21 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _odoStartCtrl.addListener(_maybeFillOdometerEnd);
+    _odoEndCtrl.addListener(() {
+      if (_odoEndCtrl.text.isNotEmpty) _odoEndManuallyEdited = true;
+    });
     _load();
   }
 
   Future<void> _load() async {
-    final t = await TripRepository.findById(widget.tripId);
+    final results = await Future.wait<Object?>([
+      TripRepository.findById(widget.tripId),
+      TripRepository.distinctDriverNames(),
+    ]);
     if (!mounted) return;
+    final t = results[0] as TripRecord?;
+    final names = results[1] as List<String>;
     if (t == null) {
       setState(() => _loading = false);
       return;
@@ -57,11 +69,32 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     _purposeCtrl.text = t.purpose;
     _odoStartCtrl.text = t.odometerStart?.toString() ?? '';
     _odoEndCtrl.text = t.odometerEnd?.toString() ?? '';
+    _odoEndManuallyEdited = t.odometerEnd != null;
     _kind = t.kind;
     setState(() {
       _trip = t;
+      _driverSuggestions = names;
       _loading = false;
     });
+  }
+
+  /// When the driver fills in the start odometer and the end is still empty,
+  /// suggest `start + round(distanceKm)`. The driver can override; once they
+  /// type into the end field manually we stop auto-filling.
+  void _maybeFillOdometerEnd() {
+    if (_odoEndManuallyEdited) return;
+    final t = _trip;
+    if (t == null || t.distanceKm == null) return;
+    final start = int.tryParse(_odoStartCtrl.text.trim());
+    if (start == null) return;
+    final suggested = start + t.distanceKm!.round();
+    final current = _odoEndCtrl.text;
+    final newText = suggested.toString();
+    if (current == newText) return;
+    _odoEndCtrl.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
   }
 
   @override
@@ -176,13 +209,29 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          TextField(
-            controller: _driverCtrl,
-            decoration: InputDecoration(
-              labelText: loc.tripDriverLabel,
-              prefixIcon: const Icon(Icons.person_outline),
-              border: const OutlineInputBorder(),
-            ),
+          Autocomplete<String>(
+            initialValue: TextEditingValue(text: _driverCtrl.text),
+            optionsBuilder: (input) {
+              if (input.text.isEmpty) return _driverSuggestions;
+              final q = input.text.toLowerCase();
+              return _driverSuggestions
+                  .where((n) => n.toLowerCase().contains(q));
+            },
+            onSelected: (v) => _driverCtrl.text = v,
+            fieldViewBuilder: (ctx, controller, focusNode, _) {
+              // Mirror the autocomplete's controller back into our state
+              // controller so `_save()` reads the latest value.
+              controller.addListener(() => _driverCtrl.text = controller.text);
+              return TextField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: InputDecoration(
+                  labelText: loc.tripDriverLabel,
+                  prefixIcon: const Icon(Icons.person_outline),
+                  border: const OutlineInputBorder(),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 12),
           TextField(

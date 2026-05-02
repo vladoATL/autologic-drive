@@ -146,6 +146,19 @@ class TripRepository {
     return list.length;
   }
 
+  /// Names that have ever been used as `driver_name` on a trip — for the
+  /// driver autocomplete in `TripDetailScreen`. Excludes nulls and empty
+  /// strings; returns alphabetised list.
+  static Future<List<String>> distinctDriverNames() async {
+    final db = await _open();
+    final rows = await db.rawQuery(
+      "SELECT DISTINCT driver_name FROM $_table "
+      "WHERE driver_name IS NOT NULL AND driver_name != '' "
+      "ORDER BY driver_name COLLATE NOCASE",
+    );
+    return rows.map((r) => r['driver_name'] as String).toList();
+  }
+
   static Future<void> delete(String id) async {
     final db = await _open();
     await db.delete(_table, where: 'id = ?', whereArgs: [id]);

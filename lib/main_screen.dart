@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:autologic_drive/auth/traccar_api.dart';
 import 'package:autologic_drive/main.dart';
 import 'package:autologic_drive/password_service.dart';
@@ -28,10 +29,24 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+  String _appVersion = '';
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _appVersion = '${info.version} (${info.buildNumber})');
+      }
+    } catch (_) {
+      // ignore — drawer footer just renders empty
+    }
   }
 
   @override
@@ -380,6 +395,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
+            if (_appVersion.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'AutoLogic Drive · v$_appVersion',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                ),
+              ),
           ],
         ),
       ),

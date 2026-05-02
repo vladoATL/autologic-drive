@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.1 — 2026-05-02
+
+Trip-detail polish based on real-driving feedback.
+
+### Added
+- **App version footer** in the navigation drawer (`AutoLogic Drive · vX.Y.Z (build)`)
+  via `package_info_plus`, so it's clear at a glance which version is in
+  use during testing.
+- **Driver autocomplete** in `TripDetailScreen` — typing into the driver
+  field shows previously-used names (`SELECT DISTINCT driver_name`),
+  with the full list as default suggestions when the field is empty.
+  Useful when one phone is shared between family members.
+- **Auto-fill end odometer**: filling in the start odometer pre-fills the
+  end odometer with `start + round(distanceKm)`, picking up the GPS
+  distance recorded during the trip. Stops auto-filling once the driver
+  edits the end field manually, so corrections aren't overwritten.
+
 ## 0.9.0 — 2026-05-02
 
 **Kniha jázd** — local trip log with the legally-required fields
