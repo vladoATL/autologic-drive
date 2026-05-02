@@ -22,6 +22,13 @@ abstract class TrackingEngine {
     Map<String, dynamic>? extras,
   });
 
+  /// Ship a single location to the configured server.
+  ///
+  /// FBG-style adapters that own their own HTTP layer can no-op here and
+  /// rely on `sync()`. Adapters without a built-in HTTP layer (Tracelet)
+  /// implement this via a custom sender (see `OsmAndSender`).
+  Future<void> dispatchLocation(TrackedLocation location);
+
   Future<void> sync();
   Future<void> destroyLocation(String uuid);
 

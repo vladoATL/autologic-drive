@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.3.0 — 2026-05-02
+
+Drops the commercial `flutter_background_geolocation` SDK in favour of
+[`tracelet`](https://pub.dev/packages/tracelet) (Apache 2.0). No more $500
+per-app license.
+
+### Added
+- `lib/tracking/tracelet_engine.dart` — `TraceletEngine implements TrackingEngine`,
+  the new default engine (wired in `lib/tracking/engine.dart`).
+- `lib/tracking/osmand_sender.dart` — custom HTTP layer that POSTs Traccar
+  OsmAnd query-string parameters to `:5055`. Tracelet's built-in `HttpConfig`
+  posts JSON, which the OsmAnd protocol does not accept; we bypass it.
+  Includes a `SharedPreferences`-backed retry queue (FIFO, max 200 entries)
+  for offline buffering — failed sends are flushed on the next successful
+  send.
+- `dispatchLocation(TrackedLocation)` method on the `TrackingEngine` interface.
+  Each adapter decides how to ship a single location: `TraceletEngine` calls
+  `OsmAndSender.send`, the (now-removed) `FbgEngine` would have used
+  `BackgroundGeolocation.sync`.
+
+### Removed
+- `flutter_background_geolocation` from `pubspec.yaml` (and corresponding
+  Gradle plugin / license meta-data stub from `AndroidManifest.xml`).
+- `lib/tracking/fbg_engine.dart`. To restore: `git show v0.2.0:lib/tracking/fbg_engine.dart`
+  and re-add the dependency.
+
+### Notes
+- Tracelet's `Tracelet.openBatterySettings()` opens the system Battery
+  Optimization page directly — there is no native dialog wrapper like FBG's
+  `DeviceSettings.showIgnoreBatteryOptimizations()`. Behaviour from the
+  user's perspective is the same.
+- `engine.sync()` is now a no-op for Tracelet. Per-location dispatch goes
+  through `dispatchLocation`.
+
 ## 0.2.0 — 2026-05-02
 
 Engine-pluggable tracking architecture. No user-visible behavior change; the

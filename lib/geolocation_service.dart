@@ -63,7 +63,7 @@ class GeolocationService {
     } else {
       LocationCache.set(location);
       try {
-        await engine.sync();
+        await engine.dispatchLocation(location);
       } catch (error) {
         developer.log('Failed to send location', error: error);
       }

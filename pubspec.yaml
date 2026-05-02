@@ -1,7 +1,7 @@
 name: autologic_drive
 description: "AutoLogic Drive — GPS tracker pre vozový park Starlogic AutoLogic."
 publish_to: 'none'
-version: 0.2.0+2
+version: 0.3.0+3
 
 environment:
   sdk: ^3.7.2
@@ -12,7 +12,8 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: any
-  flutter_background_geolocation: ^5.1.2
+  tracelet: ^1.9.1
+  http: ^1.2.0
   shared_preferences: ^2.5.5
   quick_actions: ^1.1.0
   shared_preferences_android: ^2.4.23

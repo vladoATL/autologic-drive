@@ -141,7 +141,12 @@ class _MainScreenState extends State<MainScreen> {
                 FilledButton.tonal(
                   onPressed: () async {
                     try {
-                      await engine.getCurrentPosition(samples: 1, persist: true, extras: {'manual': true});
+                      final loc = await engine.getCurrentPosition(
+                        samples: 1,
+                        persist: true,
+                        extras: {'manual': true},
+                      );
+                      await engine.dispatchLocation(loc);
                     } on PlatformException catch (error) {
                       messengerKey.currentState?.showSnackBar(SnackBar(content: Text(error.message ?? error.code)));
                     }

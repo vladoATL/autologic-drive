@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'l10n/app_localizations.dart';
 import 'tracking/engine.dart';
@@ -31,6 +32,15 @@ class _StatusScreenState extends State<StatusScreen> {
     await engine.emailLog("support@starlogic.net");
   }
 
+  Future<void> _copyLogs() async {
+    final text = await engine.getLog();
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Logs copied to clipboard')),
+    );
+  }
+
   Future<void> _clearLogs() async {
     await engine.destroyLog();
     setState(() => _logs.clear());
@@ -45,6 +55,11 @@ class _StatusScreenState extends State<StatusScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _refreshLogs,
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy),
+            tooltip: 'Copy to clipboard',
+            onPressed: _copyLogs,
           ),
           IconButton(
             icon: const Icon(Icons.share),

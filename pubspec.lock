@@ -158,14 +158,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_background_geolocation:
-    dependency: "direct main"
-    description:
-      name: flutter_background_geolocation
-      sha256: e680365eb3a7bff4f3e2027261ca86148e1505a939c3b9dd73d7d93669db7fdb
-      url: "https://pub.dev"
-    source: hosted
-    version: "5.1.2"
   flutter_launcher_icons:
     dependency: "direct dev"
     description:
@@ -269,6 +261,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.3"
+  http:
+    dependency: "direct main"
+    description:
+      name: http
+      sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.0"
+  http_parser:
+    dependency: transitive
+    description:
+      name: http_parser
+      sha256: "178d74305e7866013777bab2c3d8726205dc5a4dd935297175b19a23a2e66571"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.1.2"
   image:
     dependency: transitive
     description:
@@ -650,6 +658,46 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.9"
+  tracelet:
+    dependency: "direct main"
+    description:
+      name: tracelet
+      sha256: "7e64e4501ec8389dd297fec27a7034c502f7852adcba4a1087f10a993bcea1d1"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.9.1"
+  tracelet_android:
+    dependency: transitive
+    description:
+      name: tracelet_android
+      sha256: f47781e573f1baf34fce40eb8c4db87425beb7ef82e66971f8a0c89b3b69ee19
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.9.1"
+  tracelet_ios:
+    dependency: transitive
+    description:
+      name: tracelet_ios
+      sha256: cd3cf8bf1e7238ee9517862206114b12e2549c4938727d8c9f3a84315deedf48
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.9.1"
+  tracelet_platform_interface:
+    dependency: transitive
+    description:
+      name: tracelet_platform_interface
+      sha256: "7226a4e569a4f07f2598caa6385b9391f177051e56eae2334beca558dae3711c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.9.1"
+  tracelet_web:
+    dependency: transitive
+    description:
+      name: tracelet_web
+      sha256: dc7c8f697ed97dc5728e0be3998db3e42956d7d1c625e4aa8c78000ceac413b0
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.9.1"
   typed_data:
     dependency: transitive
     description:

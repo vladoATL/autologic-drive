@@ -40,13 +40,6 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-        <!-- flutter_background_geolocation license: TODO purchase from https://shop.transistorsoft.com
-             for app_id=net.starlogic.autologic.drive before release build (debug runs in trial mode). -->
-        <!--
-        <meta-data
-            android:name="com.transistorsoft.locationmanager.license"
-            android:value="REPLACE_WITH_AUTOLOGIC_LICENSE_JWT" />
-        -->
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
