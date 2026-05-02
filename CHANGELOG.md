@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.8.1 — 2026-05-02
+
+Tracking polish, log hygiene, notification fixes, and a `/simplify` pass.
+
+### Changed
+- **Tighter GPS sampling defaults** (`Preferences`): `distanceFilter`
+  75 m → 20 m, `interval` 300 s → 60 s, accuracy `medium` → `high`.
+  Traccar's straight-line route rendering now follows roads instead of
+  cutting corners between sparse fixes. Migrated automatically for
+  installs that hadn't intentionally raised these.
+- **Disconnect grace** in `BluetoothWatcher` 30 s → 15 s. Real-world car
+  BT drops both A2DP and headset within seconds of motor-off; the longer
+  grace just delayed the "trip stopped" banner without rescuing real
+  flaps.
+- **BT log filter**: `BluetoothWatcher` skips logging events for devices
+  that aren't trip-eligible (unpaired BT, paired-but-autoStart-off
+  accessories like SmartBox dongles), so the Logs screen isn't drowned
+  in irrelevant connect/disconnect chatter.
+- **Tracelet foreground-service notification** is now Slovak — *"AutoLogic
+  Drive — Zaznamenávam jazdu"* — and uses the new `ic_stat_notify` small
+  icon (custom `ForegroundServiceConfig` with `channelId =
+  autologic_tracking`). Replaces the upstream "Tracking location in
+  background" English default.
+- **Notification small icon**: replaced the launcher icon (which Android
+  rendered as a big white square in the status bar) with a proper
+  alpha-only silhouette `ic_stat_notify` rendered into all five
+  Android density buckets from the 192 px master.
+- **App launcher icon** updated to the new master in
+  `assets/icon/autologic_icon.png`; `flutter_launcher_icons` regenerated
+  every Android density.
+
+### Fixed
+- Trip-lifecycle notifications used ID `1`, the same range Tracelet's
+  foreground-service notification claims. Bumped to `1001` to avoid the
+  silent overwrite that suppressed our banner.
+- `AppNotifications.init()` now requests Android 13+ runtime
+  notification permission as a backstop for the skip-onboarding path.
+- `OnboardingScreen` had a `PageController` leak (no `dispose()`).
+
+### Refactor (`/simplify`)
+- Extracted `lib/trip/vehicle_label_dialog.dart` (`promptVehicleLabel`)
+  shared between `OnboardingScreen` and `VehiclesScreen`.
+- `OnboardingScreen` bottom-sheet vehicle action is now an enum
+  (`_VehicleAction.{rename, autoOn, autoOff, unlink}`) instead of magic
+  strings.
+- New ARB key `vehicleAutoStartOff` replaces a hardcoded SK fallback.
+- `_refreshPermissionStatuses` and the four startup `init`s in `main()`
+  use `Future.wait` for parallelism.
+
 ## 0.8.0 — 2026-05-02
 
 First-launch onboarding wizard + trip-lifecycle notifications.

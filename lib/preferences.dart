@@ -61,9 +61,14 @@ class Preferences {
     if (instance.getString(id) == null) {
       await instance.setString(id, (Random().nextInt(90000000) + 10000000).toString());
       await instance.setString(url, kAutoLogicServer.url);
-      await instance.setString(accuracy, 'medium');
-      await instance.setInt(interval, 300);
-      await instance.setInt(distance, 75);
+      // Tighter defaults for trip use case: GPS sample every ~20 m so
+      // Traccar's straight-line map rendering between points still follows
+      // the road. The fastest interval (30 s) caps how often we sample at
+      // a stoplight; the 60 s interval is the floor when distanceFilter
+      // wouldn't have triggered yet.
+      await instance.setString(accuracy, 'high');
+      await instance.setInt(interval, 60);
+      await instance.setInt(distance, 20);
       await instance.setBool(buffer, true);
       await instance.setBool(stopDetection, true);
       await instance.setInt(fastestInterval, 30);
@@ -74,6 +79,15 @@ class Preferences {
     final existingApi = instance.getString(apiUrl);
     if (existingApi == null || existingApi.isEmpty) {
       await instance.setString(apiUrl, kAutoLogicServer.apiUrl);
+    }
+    // Migration: pre-0.8.1 installs had distance=75 / interval=300 which
+    // produced jagged Traccar route lines. Bump to the new tighter defaults
+    // unless the driver intentionally raised them.
+    if ((instance.getInt(distance) ?? 0) >= 75) {
+      await instance.setInt(distance, 20);
+    }
+    if ((instance.getInt(interval) ?? 0) >= 300) {
+      await instance.setInt(interval, 60);
     }
   }
 

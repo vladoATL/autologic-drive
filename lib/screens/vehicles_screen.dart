@@ -8,6 +8,7 @@ import 'package:flutter_blue_classic/flutter_blue_classic.dart';
 import '../l10n/app_localizations.dart';
 import '../trip/bluetooth_helper.dart';
 import '../trip/vehicle.dart';
+import '../trip/vehicle_label_dialog.dart';
 import '../trip/vehicle_repository.dart';
 
 class VehiclesScreen extends StatefulWidget {
@@ -57,28 +58,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   }
 
   Future<void> _editLabel(Vehicle current) async {
-    final controller = TextEditingController(text: current.label);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.vehicleLabelHint),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Škoda Octavia BA123AB'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(AppLocalizations.of(context)!.cancelButton),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: Text(AppLocalizations.of(context)!.saveButton),
-          ),
-        ],
-      ),
-    );
+    final result = await promptVehicleLabel(context, initial: current.label);
     if (result == null) return;
     await VehicleRepository.upsert(current.copyWith(label: result));
     if (mounted) setState(() {});

@@ -29,7 +29,11 @@ class BluetoothWatcher {
 
   static StreamSubscription<dynamic>? _sub;
   static Timer? _disconnectGraceTimer;
-  static const _disconnectGrace = Duration(seconds: 30);
+  // Real-world car BT (A2DP + headset) tends to drop both profiles within a
+  // few seconds of motor-off; a longer grace just delays the "trip stopped"
+  // banner without rescuing real disconnect bounces. 15 s is enough to
+  // tolerate a one-second profile flap while still feeling responsive.
+  static const _disconnectGrace = Duration(seconds: 15);
 
   static void start() {
     _sub ??= _eventsChannel.receiveBroadcastStream().listen(_onEvent);
@@ -50,7 +54,14 @@ class BluetoothWatcher {
     try {
       final raw = await _methodsChannel.invokeMethod<List<dynamic>>('connectedDevices');
       final addresses = (raw ?? const []).cast<String>();
-      AppLogger.info('BT poll: ${addresses.length} connected — $addresses');
+      // Only mention auto-trip-eligible devices in the summary so the log
+      // doesn't fill up with smartBox / headphones / random pairings.
+      final relevant = addresses
+          .where((a) => VehicleRepository.findByMac(a)?.autoStartTrip == true)
+          .toList();
+      if (relevant.isNotEmpty) {
+        AppLogger.info('BT poll: ${relevant.length} relevant connected — $relevant');
+      }
       for (final address in addresses) {
         await _handle(address: address, state: 'connected');
       }
@@ -66,8 +77,12 @@ class BluetoothWatcher {
     final profile = raw['profile'] as String?;
     if (address == null || state == null) return;
     final vehicle = VehicleRepository.findByMac(address);
-    final label = vehicle?.label ?? '(unpaired)';
-    AppLogger.info('BT event: $label [$address] $state profile=$profile');
+    // Suppress log noise for devices that aren't trip-eligible — unpaired
+    // BT (random headphones), or paired-but-autoStart-off (smartBox-style
+    // accessories). Trip dispatch logic in `_handle` runs unconditionally.
+    if (vehicle != null && vehicle.autoStartTrip) {
+      AppLogger.info('BT event: ${vehicle.label} [$address] $state profile=$profile');
+    }
     await _handle(address: address, state: state);
   }
 

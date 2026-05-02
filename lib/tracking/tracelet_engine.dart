@@ -253,6 +253,13 @@ tl.Config _buildTlConfig(TrackingConfig c) {
       startOnBoot: true,
       heartbeatInterval: heartbeat > 0 ? heartbeat : -1,
       preventSuspend: Platform.isIOS && heartbeat > 0,
+      foregroundService: const tl.ForegroundServiceConfig(
+        channelId: 'autologic_tracking',
+        channelName: 'AutoLogic Drive — sledovanie',
+        notificationTitle: 'AutoLogic Drive',
+        notificationText: 'Zaznamenávam jazdu',
+        notificationSmallIcon: 'drawable/ic_stat_notify',
+      ),
     ),
     motion: tl.MotionConfig(
       disableStopDetection: !c.stopDetection,

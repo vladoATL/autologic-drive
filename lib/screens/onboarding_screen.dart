@@ -19,6 +19,7 @@ import '../preferences.dart';
 import '../tracking/engine.dart';
 import '../trip/bluetooth_helper.dart';
 import '../trip/vehicle.dart';
+import '../trip/vehicle_label_dialog.dart';
 import '../trip/vehicle_repository.dart';
 import '../util/app_logger.dart';
 
@@ -29,6 +30,8 @@ class OnboardingScreen extends StatefulWidget {
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
+
+enum _VehicleAction { rename, autoOn, autoOff, unlink }
 
 class _OnboardingScreenState extends State<OnboardingScreen>
     with WidgetsBindingObserver {
@@ -59,6 +62,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _pages.dispose();
     super.dispose();
   }
 
@@ -70,17 +74,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Future<void> _refreshPermissionStatuses() async {
-    final loc = await Permission.locationAlways.status;
-    final locInUse = await Permission.locationWhenInUse.status;
-    final battery = await Permission.ignoreBatteryOptimizations.status;
-    final notif = await Permission.notification.status;
+    final results = await Future.wait([
+      Permission.locationAlways.status,
+      Permission.locationWhenInUse.status,
+      Permission.ignoreBatteryOptimizations.status,
+      Permission.notification.status,
+    ]);
     if (!mounted) return;
     setState(() {
       // Allow either "always" (preferred) or "when in use" (good enough for
       // foreground-active driving, the engine just won't survive a screen-off).
-      _locationGranted = loc.isGranted || locInUse.isGranted;
-      _batteryGranted = battery.isGranted;
-      _notifGranted = notif.isGranted;
+      _locationGranted = results[0].isGranted || results[1].isGranted;
+      _batteryGranted = results[2].isGranted;
+      _notifGranted = results[3].isGranted;
     });
   }
 
@@ -173,31 +179,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Future<void> _pairAsVehicle(BluetoothDevice device) async {
-    final controller = TextEditingController(
-      text: device.alias ?? device.name ?? device.address,
+    final label = await promptVehicleLabel(
+      context,
+      initial: device.alias ?? device.name ?? device.address,
     );
-    final label = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.vehicleLabelHint),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Škoda Octavia BA123AB'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(AppLocalizations.of(context)!.cancelButton),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: Text(AppLocalizations.of(context)!.saveButton),
-          ),
-        ],
-      ),
-    );
-    if (label == null || label.isEmpty) return;
+    if (label == null) return;
     await VehicleRepository.upsert(Vehicle(
       bluetoothMac: device.address,
       bluetoothName: device.alias ?? device.name,
@@ -211,7 +197,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _editVehicle(BluetoothDevice device, Vehicle existing) async {
     final loc = AppLocalizations.of(context)!;
     final deviceName = device.alias ?? device.name ?? device.address;
-    final action = await showModalBottomSheet<String>(
+    final action = await showModalBottomSheet<_VehicleAction>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
@@ -238,19 +224,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               leading: const Icon(Icons.edit),
               title: Text(loc.vehicleRenameAction),
               subtitle: Text(existing.label),
-              onTap: () => Navigator.pop(ctx, 'rename'),
+              onTap: () => Navigator.pop(ctx, _VehicleAction.rename),
             ),
             SwitchListTile(
               secondary: const Icon(Icons.auto_awesome),
               title: Text(loc.vehicleAutoStartLabel),
               value: existing.autoStartTrip,
-              onChanged: (v) => Navigator.pop(ctx, v ? 'auto_on' : 'auto_off'),
+              onChanged: (v) => Navigator.pop(
+                ctx,
+                v ? _VehicleAction.autoOn : _VehicleAction.autoOff,
+              ),
             ),
             ListTile(
               leading: Icon(Icons.link_off,
                   color: Theme.of(context).colorScheme.error),
               title: Text(loc.vehicleUnlinkButton),
-              onTap: () => Navigator.pop(ctx, 'unlink'),
+              onTap: () => Navigator.pop(ctx, _VehicleAction.unlink),
             ),
           ],
         ),
@@ -258,24 +247,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
     if (action == null) return;
     switch (action) {
-      case 'rename':
+      case _VehicleAction.rename:
         await _pairAsVehicle(device);
-        break;
-      case 'auto_on':
+      case _VehicleAction.autoOn:
         await VehicleRepository.upsert(existing.copyWith(autoStartTrip: true));
         AppLogger.info('Vehicle ${existing.label} autoStart=true');
         if (mounted) setState(() {});
-        break;
-      case 'auto_off':
+      case _VehicleAction.autoOff:
         await VehicleRepository.upsert(existing.copyWith(autoStartTrip: false));
         AppLogger.info('Vehicle ${existing.label} autoStart=false');
         if (mounted) setState(() {});
-        break;
-      case 'unlink':
+      case _VehicleAction.unlink:
         await VehicleRepository.remove(existing.bluetoothMac);
         AppLogger.info('Vehicle ${existing.label} unlinked');
         if (mounted) setState(() {});
-        break;
     }
   }
 
@@ -464,7 +449,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               d.address),
                           subtitle: Text(
                             existing != null
-                                ? '${d.address} · ${existing.autoStartTrip ? loc.vehicleAutoStartLabel : "auto-štart vypnutý"}'
+                                ? '${d.address} · ${existing.autoStartTrip ? loc.vehicleAutoStartLabel : loc.vehicleAutoStartOff}'
                                 : d.address,
                           ),
                           trailing: existing != null

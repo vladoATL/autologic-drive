@@ -37,10 +37,15 @@ void main() async {
   appLocale.value = Locale(
     Preferences.instance.getString(Preferences.language) ?? 'sk',
   );
-  await PasswordService.migrate();
-  await GeolocationService.init();
-  await AppNotifications.init();
-  await TripController.restore();
+  // PasswordService.migrate, GeolocationService.init, AppNotifications.init
+  // and TripController.restore all read from `Preferences` (already done) but
+  // don't depend on each other — run them concurrently to shave cold-start.
+  await Future.wait([
+    PasswordService.migrate(),
+    GeolocationService.init(),
+    AppNotifications.init(),
+    TripController.restore(),
+  ]);
   BluetoothWatcher.start();
   isAuthenticated.value = TraccarApi.isLoggedIn;
   needsOnboarding.value =

@@ -16,13 +16,18 @@ class AppNotifications {
   static const _channelId = 'trip_lifecycle';
   static const _channelName = 'Jazda';
   static const _channelDesc = 'Notifikácie pri začiatku a ukončení jazdy';
-  static const _tripNotifId = 1;
+  // Avoid IDs Tracelet's foreground-service notification might be using
+  // (it tends to claim small integer IDs).
+  static const _tripNotifId = 1001;
   static bool _initialized = false;
 
   static Future<void> init() async {
     if (_initialized) return;
+    // Notification small-icons must be alpha-only silhouettes; Android colours
+    // them with the system tint. ic_stat_notify is rendered from the
+    // transparent autologic_icon master into per-density drawable folders.
     const settings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      android: AndroidInitializationSettings('ic_stat_notify'),
     );
     await _plugin.initialize(settings);
     if (Platform.isAndroid) {
@@ -32,17 +37,39 @@ class AppNotifications {
         description: _channelDesc,
         importance: Importance.defaultImportance,
       );
-      await _plugin
+      final android = _plugin
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
+              AndroidFlutterLocalNotificationsPlugin>();
+      await android?.createNotificationChannel(channel);
+      // Android 13+ refuses to surface notifications without runtime
+      // permission. The onboarding wizard handles this for new installs;
+      // cover skip-onboarding (or first launch) here as a backstop.
+      final enabled = await android?.areNotificationsEnabled() ?? false;
+      if (!enabled) {
+        final granted = await android?.requestNotificationsPermission();
+        AppLogger.info('Notification permission requested at init: $granted');
+      }
     }
     _initialized = true;
+  }
+
+  static Future<bool> _ensureNotificationsAllowed() async {
+    if (!Platform.isAndroid) return true;
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    final enabled = await android?.areNotificationsEnabled() ?? false;
+    if (!enabled) {
+      AppLogger.warn(
+        'Notifications are disabled by the OS — trip banner will not surface',
+      );
+    }
+    return enabled;
   }
 
   static Future<void> showTripStarted({String? vehicleLabel}) async {
     try {
       await init();
+      if (!await _ensureNotificationsAllowed()) return;
       await _plugin.show(
         _tripNotifId,
         'Jazda začala',
@@ -72,6 +99,7 @@ class AppNotifications {
   }) async {
     try {
       await init();
+      if (!await _ensureNotificationsAllowed()) return;
       final parts = <String>[];
       if (vehicleLabel != null && vehicleLabel.isNotEmpty) parts.add(vehicleLabel);
       if (duration != null) parts.add(_formatDuration(duration));

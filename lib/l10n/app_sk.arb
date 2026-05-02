@@ -38,6 +38,7 @@
   "vehiclesTitle": "Vozidlá",
   "vehicleLabelHint": "Názov vozidla",
   "vehicleAutoStartLabel": "Auto-štart pri pripojení",
+  "vehicleAutoStartOff": "auto-štart vypnutý",
   "vehicleAutoStartHint": "Automaticky začať jazdu, keď sa telefón pripojí na toto Bluetooth zariadenie (pripravené pre 0.4.1).",
   "vehicleUnlinkButton": "Zrušiť priradenie",
   "vehicleRenameAction": "Premenovať",

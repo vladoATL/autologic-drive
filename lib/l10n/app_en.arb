@@ -38,6 +38,7 @@
   "vehiclesTitle": "Vehicles",
   "vehicleLabelHint": "Vehicle name",
   "vehicleAutoStartLabel": "Auto-start on connect",
+  "vehicleAutoStartOff": "auto-start off",
   "vehicleAutoStartHint": "Automatically start a trip when the phone pairs to this Bluetooth device (wired in 0.4.1).",
   "vehicleUnlinkButton": "Unlink",
   "vehicleRenameAction": "Rename",
