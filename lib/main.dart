@@ -6,10 +6,12 @@ import 'package:autologic_drive/quick_actions.dart';
 import 'package:autologic_drive/trip/bluetooth_watcher.dart';
 import 'package:autologic_drive/trip/trip_controller.dart';
 
+import 'auth/traccar_api.dart';
 import 'l10n/app_localizations.dart';
 import 'main_screen.dart';
 import 'preferences.dart';
 import 'configuration_service.dart';
+import 'screens/login_screen.dart';
 
 final messengerKey = GlobalKey<ScaffoldMessengerState>();
 
@@ -18,6 +20,10 @@ const _seedColor = Color(0xFF1A1A1A);
 /// Globálny holder UI jazyka. Settings → Language ho prepisuje, MaterialApp
 /// počúva cez `ListenableBuilder` a okamžite prerendruje.
 final ValueNotifier<Locale> appLocale = ValueNotifier<Locale>(const Locale('sk'));
+
+/// Drives the AuthGate to switch between LoginScreen and MainScreen without
+/// rebuilding the whole app.
+final ValueNotifier<bool> isAuthenticated = ValueNotifier<bool>(false);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +35,7 @@ void main() async {
   await GeolocationService.init();
   await TripController.restore();
   BluetoothWatcher.start();
+  isAuthenticated.value = TraccarApi.isLoggedIn;
   runApp(const MainApp());
 }
 
@@ -78,11 +85,21 @@ class _MainAppState extends State<MainApp> {
             brightness: Brightness.dark,
           ),
         ),
-        home: Stack(
-          children: const [
-            QuickActionsInitializer(),
-            MainScreen(),
-          ],
+        home: ValueListenableBuilder<bool>(
+          valueListenable: isAuthenticated,
+          builder: (context, loggedIn, _) {
+            if (!loggedIn) {
+              return LoginScreen(
+                onLoggedIn: () => isAuthenticated.value = true,
+              );
+            }
+            return Stack(
+              children: const [
+                QuickActionsInitializer(),
+                MainScreen(),
+              ],
+            );
+          },
         ),
       ),
     );

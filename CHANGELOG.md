@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.5.0 — 2026-05-02
+
+Login flow + automatic device registration. The app no longer relies on
+manually pre-registered Traccar devices — the user signs in with their
+existing Traccar credentials, and the phone auto-registers itself as a
+device under that account on first login.
+
+### Added
+- `lib/auth/traccar_api.dart` — minimal Traccar REST client (POST/GET/DELETE
+  on `/api/session`, GET/POST `/api/devices`). Captures `JSESSIONID` from
+  `Set-Cookie` and replays it on subsequent requests via the `Cookie`
+  header. Cookie + email + userId persist in `Preferences`.
+- `lib/screens/login_screen.dart` — entry-point screen with email + password
+  fields. Auto-creates a device under the logged-in user (`uniqueId =
+  Preferences.id`, `name = "Drive · android"`) right after a successful
+  sign-in. Idempotent: looks the device up first via
+  `GET /api/devices?uniqueId=...` and skips creation if already present.
+- *Vytvoriť účet* button — placeholder snackbar for now (registration policy
+  still TBD; Traccar self-registration is currently disabled server-side).
+- `AuthGate` in `main.dart`: `MaterialApp.home` toggles between
+  `LoginScreen` and `MainScreen` based on a global `isAuthenticated`
+  `ValueNotifier`, so login/logout takes effect without rebuilding the
+  whole app.
+- Drawer **Odhlásiť sa** entry: stops any active trip, calls
+  `DELETE /api/session`, clears the local cookie, and bounces back to the
+  login screen.
+- `ServerPreset.apiUrl` (port 8082 in dev, https in prod) plus
+  `Preferences.apiUrl` migration for installs predating 0.5.0.
+- New auth strings in all three locales.
+
+### Changed
+- `Preferences.init()` migrates pre-0.5.0 installs by seeding `apiUrl`
+  with the AutoLogic preset if it's missing.
+- Login email and trip toggles are logged in `AppLogger`, so the Status
+  screen captures the full session lifecycle.
+
+### Notes
+- Dev server-side: `docker-compose.dev.yml` now binds Traccar's web port
+  to `0.0.0.0:8082:8082` so the phone can reach `/api` over the LAN /
+  router port-forward; the production deployment will sit behind Caddy
+  on `:443`.
+
 ## 0.4.0 — 2026-05-02
 
 Trip lifecycle, vehicle pairing, Bluetooth auto-detect, drawer navigation,

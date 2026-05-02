@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
+import 'package:autologic_drive/auth/traccar_api.dart';
 import 'package:autologic_drive/main.dart';
 import 'package:autologic_drive/password_service.dart';
 import 'package:autologic_drive/preferences.dart';
@@ -331,6 +332,23 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               onTap: () {
                 Navigator.pop(context);
                 _sendDiagnosticLocation();
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: Text(loc.logoutButton),
+              subtitle: Text(
+                Preferences.instance.getString(Preferences.authEmail) ?? '',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              onTap: () async {
+                Navigator.pop(context);
+                if (tripState.value.active) {
+                  await TripController.stop();
+                }
+                await TraccarApi.logout();
+                isAuthenticated.value = false;
               },
             ),
             const Divider(),
