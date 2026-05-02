@@ -34,9 +34,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  assets:
+    - assets/icon/autologic_icon.png
 
-# Enable once assets/icon/autologic_icon.png is generated from
-# C:\Projects\starlogic-autologic\images\autologic_icon.svg (see CHANGELOG).
 flutter_launcher_icons:
   android: true
   ios: false

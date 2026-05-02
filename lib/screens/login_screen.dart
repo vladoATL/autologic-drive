@@ -133,7 +133,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.directions_car, size: 64),
+                  Center(
+                    child: Container(
+                      width: 112,
+                      height: 112,
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE8F0FE),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Image.asset('assets/icon/autologic_icon.png'),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'AutoLogic Drive',
