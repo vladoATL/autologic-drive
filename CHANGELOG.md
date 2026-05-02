@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.0 — 2026-05-02
+
+QR-code / deep-link onboarding so a fleet admin can hand a new driver
+preconfigured server URL + email without typing.
+
+### Added
+- `lib/screens/qr_scan_screen.dart` — full-screen camera using
+  `mobile_scanner`. Pops with the decoded string on first read.
+- *Naskenovať QR* button on the login screen that pushes the scanner,
+  feeds the result through `ConfigurationService.applyUri`, pre-fills
+  the email field, and shows a *Konfigurácia načítaná z QR* toast.
+- Three new query parameters supported by `ConfigurationService.applyUri`:
+  `api` (Traccar REST URL), `osmand` (alias of legacy `url`), `email`
+  (login pre-fill). Existing tracking-tunable params are unchanged.
+- Localization for QR scan strings (sk/cs/en).
+
+### Notes
+- Onboarding link format:
+  `autologic-drive://configure?api=<api-url>&osmand=<osmand-url>&email=<driver-email>`
+- Companion admin tool lives in the
+  [starlogic-autologic](https://github.com/vladoATL/autologic) repo at
+  `tools/onboard.html` — a static page that takes the same three fields
+  and produces a QR + shareable link. Password is **not** included in the
+  link; the admin sends it through a separate channel (SMS, ...).
+
 ## 0.5.0 — 2026-05-02
 
 Login flow + automatic device registration. The app no longer relies on

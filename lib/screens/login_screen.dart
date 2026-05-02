@@ -10,9 +10,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../auth/traccar_api.dart';
+import '../configuration_service.dart';
 import '../l10n/app_localizations.dart';
 import '../preferences.dart';
 import '../util/app_logger.dart';
+import 'qr_scan_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoggedIn;
@@ -88,6 +90,34 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _scanQr() async {
+    final raw = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const QrScanScreen()),
+    );
+    if (raw == null || !mounted) return;
+    Uri? uri;
+    try {
+      uri = Uri.parse(raw);
+    } catch (_) {
+      uri = null;
+    }
+    if (uri == null) {
+      setState(() => _error = AppLocalizations.of(context)!.qrInvalid);
+      return;
+    }
+    await ConfigurationService.applyUri(uri);
+    final email = Preferences.instance.getString(Preferences.authEmail);
+    if (email != null) _emailCtrl.text = email;
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context)!.qrApplied),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -157,6 +187,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _scanQr,
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: Text(loc.qrScanButton),
                   ),
                   const SizedBox(height: 8),
                   TextButton(
