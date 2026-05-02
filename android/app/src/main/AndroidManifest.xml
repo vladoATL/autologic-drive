@@ -2,6 +2,24 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+
+    <!-- Bluetooth: list paired devices for vehicle pairing UI (Vehicles screen).
+         API 31+ uses BLUETOOTH_CONNECT; we mark the scan as not-for-location
+         since we never derive the device's geographic location from BT. -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT"
+        android:minSdkVersion="31" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        android:minSdkVersion="31" />
+    <!-- Legacy permissions for API 26-30 (we already require minSdk 26). -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
     <application
         tools:replace="android:label"
         android:label="AutoLogic Drive"

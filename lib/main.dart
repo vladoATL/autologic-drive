@@ -3,6 +3,8 @@ import 'package:app_links/app_links.dart';
 import 'package:autologic_drive/geolocation_service.dart';
 import 'package:autologic_drive/password_service.dart';
 import 'package:autologic_drive/quick_actions.dart';
+import 'package:autologic_drive/trip/bluetooth_watcher.dart';
+import 'package:autologic_drive/trip/trip_controller.dart';
 
 import 'l10n/app_localizations.dart';
 import 'main_screen.dart';
@@ -25,6 +27,8 @@ void main() async {
   );
   await PasswordService.migrate();
   await GeolocationService.init();
+  await TripController.restore();
+  BluetoothWatcher.start();
   runApp(const MainApp());
 }
 

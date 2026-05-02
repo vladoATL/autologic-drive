@@ -10,11 +10,11 @@
 library;
 
 import 'dart:convert';
-import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../util/app_logger.dart';
 import 'tracking_engine.dart';
 
 class OsmAndSender {
@@ -39,14 +39,20 @@ class OsmAndSender {
   static Future<bool> _send(String url, String deviceId, TrackedLocation loc) async {
     try {
       final uri = _buildUri(url, deviceId, loc);
-      final resp = await http.post(uri).timeout(_httpTimeout);
+      // Traccar's OsmAnd protocol decoder expects an HTTP GET with query
+      // parameters; POSTing with empty body returns HTTP 400.
+      final resp = await http.get(uri).timeout(_httpTimeout);
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        AppLogger.info(
+          'Sent ${loc.latitude.toStringAsFixed(5)},${loc.longitude.toStringAsFixed(5)} '
+          '(±${loc.accuracy.toStringAsFixed(0)}m, ${(loc.speed * 3.6).toStringAsFixed(0)} km/h) → HTTP ${resp.statusCode}',
+        );
         return true;
       }
-      developer.log('OsmAnd HTTP ${resp.statusCode}: ${resp.body}');
+      AppLogger.warn('Send rejected: HTTP ${resp.statusCode}: ${resp.body}');
       return false;
     } catch (error) {
-      developer.log('OsmAnd send failed', error: error);
+      AppLogger.error('Send failed: $error');
       return false;
     }
   }
@@ -81,6 +87,7 @@ class OsmAndSender {
       queue.removeAt(0);
     }
     await prefs.setStringList(_queueKey, queue);
+    AppLogger.warn('Queued offline (pending=${queue.length})');
   }
 
   static Future<void> _flushQueue() async {
@@ -93,15 +100,19 @@ class OsmAndSender {
       try {
         final decoded = jsonDecode(entry) as Map<String, dynamic>;
         final uri = Uri.parse(decoded['uri'] as String);
-        final resp = await http.post(uri).timeout(_httpTimeout);
+        final resp = await http.get(uri).timeout(_httpTimeout);
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
           remaining.add(entry);
         }
       } catch (error) {
-        developer.log('OsmAnd flush entry failed', error: error);
+        AppLogger.error('Queue flush entry failed: $error');
         remaining.add(entry);
       }
     }
     await prefs.setStringList(_queueKey, remaining);
+    final flushed = queue.length - remaining.length;
+    if (flushed > 0) {
+      AppLogger.info('Flushed $flushed queued (pending=${remaining.length})');
+    }
   }
 }

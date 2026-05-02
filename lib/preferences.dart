@@ -24,6 +24,7 @@ class Preferences {
   static const String stopDetection = 'stop_detection';
   static const String password = 'password';
   static const String language = 'language';
+  static const String autoDetect = 'auto_detect';
 
   static const String lastTimestamp = 'lastTimestamp';
   static const String lastLatitude = 'lastLatitude';
@@ -43,8 +44,11 @@ class Preferences {
       cacheOptions: SharedPreferencesWithCacheOptions(
         allowList: {
           id, url, accuracy, distance, interval, angle, heartbeat,
-          fastestInterval, buffer,  wakelock, stopDetection, password, language,
+          fastestInterval, buffer,  wakelock, stopDetection, password, language, autoDetect,
           lastTimestamp, lastLatitude, lastLongitude, lastHeading,
+          // Trip + vehicles (TripController, VehicleRepository, OsmAndSender):
+          'trip_active', 'trip_vehicle_mac', 'trip_started_at', 'trip_source',
+          'vehicles', 'osmand_outbox',
         },
       ),
     );

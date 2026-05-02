@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'l10n/app_localizations.dart';
 import 'tracking/engine.dart';
+import 'util/app_logger.dart';
 
 class StatusScreen extends StatefulWidget {
   const StatusScreen({super.key});
@@ -20,11 +21,27 @@ class _StatusScreenState extends State<StatusScreen> {
     _refreshLogs();
   }
 
+  Future<String> _combinedLogs() async {
+    final app = await AppLogger.read();
+    final sdk = await engine.getLog();
+    final buf = StringBuffer();
+    if (app.isNotEmpty) {
+      buf.writeln('=== AutoLogic Drive ===');
+      buf.writeln(app);
+      buf.writeln();
+    }
+    if (sdk.isNotEmpty) {
+      buf.writeln('=== Tracelet SDK ===');
+      buf.writeln(sdk);
+    }
+    return buf.toString();
+  }
+
   Future<void> _refreshLogs() async {
-    final logs = await engine.getLog();
+    final text = await _combinedLogs();
     setState(() {
       _logs.clear();
-      _logs.addAll(logs.split('\n'));
+      _logs.addAll(text.split('\n'));
     });
   }
 
@@ -33,7 +50,7 @@ class _StatusScreenState extends State<StatusScreen> {
   }
 
   Future<void> _copyLogs() async {
-    final text = await engine.getLog();
+    final text = await _combinedLogs();
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -43,6 +60,7 @@ class _StatusScreenState extends State<StatusScreen> {
 
   Future<void> _clearLogs() async {
     await engine.destroyLog();
+    await AppLogger.clear();
     setState(() => _logs.clear());
   }
 
@@ -72,7 +90,6 @@ class _StatusScreenState extends State<StatusScreen> {
         ],
       ),
       body: ListView.builder(
-        reverse: true,
         itemCount: _logs.length,
         itemBuilder: (_, index) => Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0),

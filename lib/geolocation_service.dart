@@ -8,6 +8,7 @@ import 'location_cache.dart';
 import 'preferences.dart';
 import 'tracking/engine.dart';
 import 'tracking/tracking_engine.dart';
+import 'util/app_logger.dart';
 
 class GeolocationService {
   static Future<void> init() async {
@@ -36,6 +37,10 @@ class GeolocationService {
   }
 
   static Future<void> onMotionChange(TrackedLocation location) async {
+    AppLogger.info(
+      'Motion: ${location.isMoving ? "MOVING" : "stationary"} '
+      '(${(location.speed * 3.6).toStringAsFixed(0)} km/h)',
+    );
     if (Preferences.instance.getBool(Preferences.wakelock) ?? false) {
       if (location.isMoving) {
         await WakelockPartialAndroid.acquire();

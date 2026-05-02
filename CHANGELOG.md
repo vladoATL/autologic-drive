@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.4.0 — 2026-05-02
+
+Trip lifecycle, vehicle pairing, Bluetooth auto-detect, drawer navigation,
+detailed AppLogger.
+
+### Added
+- **Trip card** as the main-screen primary surface. Big Start / Stop button,
+  current vehicle label, live duration, GPS-active pulse indicator, and the
+  source (manual vs Bluetooth).
+- **Vehicles screen** (drawer → Vozidlá). Lists paired Bluetooth devices,
+  attaches a vehicle label, and lets the driver toggle *Auto-start on
+  connect* per device.
+- **Auto-detect toggle** on the main screen. When ON, paired vehicles with
+  *Auto-start* enabled trigger trip start/stop on Bluetooth A2DP/HFP
+  connect/disconnect events.
+- **Bluetooth A2DP/HFP listener** (native `BroadcastReceiver` + EventChannel
+  in `MainActivity.kt`) plus a foreground re-poll on every app resume that
+  back-stops missed broadcasts.
+- **Disconnect grace period** (30 s) — multi-BT cars (headunit + OBD +
+  handsfree dock) keep the trip running until the last known device drops
+  off the network.
+- **Drawer navigation menu**: Vehicles, Settings, Logs, *Send location*
+  (now relabelled as a diagnostic tool, not a primary action).
+- **AppLogger** — persistent ring buffer of app-level events (BT, trip
+  lifecycle, send results, motion, toggles), merged into the Logs screen
+  alongside Tracelet's SDK log.
+- New trip / vehicle / locale strings in `app_sk.arb`, `app_cs.arb`,
+  `app_en.arb`.
+- `flutter_blue_classic`, `permission_handler`, `http` dependencies.
+- Bluetooth runtime permissions (`BLUETOOTH_CONNECT`, `BLUETOOTH_SCAN`)
+  declared in `AndroidManifest.xml`.
+
+### Changed
+- Tracking engine no longer auto-starts on app launch. `TripController`
+  drives `engine.start/stop` so the GPS only burns battery during trips.
+- `TraceletEngine.getCurrentPosition` and `start()` skip
+  `requestLocationAuthorization` when the permission is already granted —
+  no more spurious system-settings page redirections.
+- `OsmAndSender` now ships positions over **HTTP GET** with query
+  parameters (Traccar's OsmAnd decoder rejected our previous POST with an
+  empty body and returned HTTP 400).
+- "Začať jazdu" string changed to *Vozidlo stojí / Vozidlo v pohybe*.
+- Status screen merges AppLogger and Tracelet logs (newest first), and
+  has a *Copy to clipboard* icon for sharing.
+
+### Notes / known limitations
+- Background-while-process-killed BT detection still requires a
+  manifest-declared receiver (planned 0.4.x). For now auto-detect works
+  while the app process is alive; foregrounding the app re-polls and
+  back-fills missed connect events.
+- Devices must be **registered in Traccar** by `uniqueId` before positions
+  are accepted — otherwise the server returns HTTP 400. Auto-registration
+  via login is planned for 0.5.0.
+- `flutter_blue_classic` v0.0.9 only enumerates bonded devices; profile
+  proxies live in our native Kotlin layer.
+
 ## 0.3.1 — 2026-05-02
 
 Slovak as default UI language + in-app language switcher.

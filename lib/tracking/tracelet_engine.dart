@@ -39,9 +39,7 @@ class TraceletEngine implements TrackingEngine {
 
   @override
   Future<bool> start() async {
-    // Tracelet does not auto-prompt for permissions inside `start()`. If we
-    // skip this request, the SDK silently fails to acquire fixes.
-    await tl.Tracelet.requestLocationAuthorization();
+    await _ensureLocationAuthorization();
     final state = await tl.Tracelet.start();
     return state.enabled;
   }
@@ -58,9 +56,29 @@ class TraceletEngine implements TrackingEngine {
     bool persist = true,
     Map<String, dynamic>? extras,
   }) async {
-    await tl.Tracelet.requestLocationAuthorization();
+    await _ensureLocationAuthorization();
     final loc = await tl.Tracelet.getCurrentPosition();
     return _toTrackedLocation(loc);
+  }
+
+  /// Only ask for location permission when we don't already have it.
+  /// Without this guard, Tracelet treats every call as a fresh prompt and
+  /// jumps straight to the system Settings page when foreground access is
+  /// granted but background isn't — flickering for the user.
+  Future<void> _ensureLocationAuthorization() async {
+    final current = await tl.Tracelet.getLocationAuthorization();
+    if (current == tl.AuthorizationStatus.always ||
+        current == tl.AuthorizationStatus.whenInUse) {
+      return;
+    }
+    final result = await tl.Tracelet.requestLocationAuthorization();
+    if (result != tl.AuthorizationStatus.always &&
+        result != tl.AuthorizationStatus.whenInUse) {
+      // Without at least foreground location permission, Tracelet's
+      // foreground location service hits a SecurityException at startup
+      // (Android 14+). Abort early so the caller can show an error.
+      throw StateError('location_permission_denied');
+    }
   }
 
   @override
