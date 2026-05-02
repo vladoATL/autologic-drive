@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.0 — 2026-05-02
+
+Login screen polish + biometric quick-unlock.
+
+### Added
+- `lib/auth/biometric_login.dart` — wraps `local_auth` and stores
+  email + password in `flutter_secure_storage` (Android Keystore-backed)
+  when the driver opts into *Zapamätať prihlásenie*. Subsequent launches
+  offer a fingerprint / PIN unlock that auto-replays the saved credentials
+  through `TraccarApi.login`.
+- *Show / hide password* toggle in the password field.
+- *Zapamätať prihlásenie* checkbox (defaults to on).
+- *Prihlásiť sa odtlačkom / PIN-om* button shown only when the device
+  supports biometric and there are saved credentials from a previous login.
+- New auth strings in all three locales.
+
+### Changed
+- Login screen body wrapped in `SingleChildScrollView` + `IntrinsicHeight`
+  so opening the soft keyboard no longer triggers
+  *BOTTOM OVERFLOWED BY N PIXELS*.
+- `MainActivity` now extends `FlutterFragmentActivity` (required by
+  `local_auth`'s `BiometricPrompt`) instead of `FlutterActivity`.
+- *tripIdle* localised label changed from *Vozidlo stojí* to
+  *Vozidlo pripravené na jazdu* (sk), *Vozidlo připravené k jízdě* (cs),
+  *Ready to drive* (en).
+
 ## 0.6.0 — 2026-05-02
 
 QR-code / deep-link onboarding so a fleet admin can hand a new driver

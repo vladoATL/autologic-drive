@@ -10,12 +10,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+// Must be FlutterFragmentActivity (not FlutterActivity) so local_auth's
+// BiometricPrompt can attach to a fragment manager.
+class MainActivity : FlutterFragmentActivity() {
 
     private val eventsChannelName = "net.starlogic.autologic.drive/bt_connections"
     private val methodsChannelName = "net.starlogic.autologic.drive/bt_methods"
