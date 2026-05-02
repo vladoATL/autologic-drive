@@ -216,6 +216,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildLanguageListTile() {
+    const options = <(String, String)>[
+      ('sk', 'Slovenčina'),
+      ('cs', 'Čeština'),
+      ('en', 'English'),
+    ];
+    final current = Preferences.instance.getString(Preferences.language) ?? 'sk';
+    final currentLabel = options.firstWhere(
+      (o) => o.$1 == current,
+      orElse: () => options.first,
+    ).$2;
+    return ListTile(
+      title: Text(AppLocalizations.of(context)!.languageLabel),
+      subtitle: Text(currentLabel),
+      onTap: () async {
+        final picked = await showDialog<String>(
+          context: context,
+          builder: (context) => SimpleDialog(
+            title: Text(AppLocalizations.of(context)!.languageLabel),
+            children: [
+              for (final o in options)
+                SimpleDialogOption(
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(o.$2)),
+                      if (o.$1 == current) const Icon(Icons.check),
+                    ],
+                  ),
+                  onPressed: () => Navigator.pop(context, o.$1),
+                ),
+            ],
+          ),
+        );
+        if (picked != null) {
+          await Preferences.instance.setString(Preferences.language, picked);
+          appLocale.value = Locale(picked);
+          if (mounted) setState(() {});
+        }
+      },
+    );
+  }
+
   Widget _buildAccuracyListTile() {
     final accuracyOptions = ['highest', 'high', 'medium', 'low'];
     return ListTile(
@@ -260,6 +302,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: ListView(
         children: [
+          _buildLanguageListTile(),
           _buildListTile(AppLocalizations.of(context)!.idLabel, Preferences.id, false),
           _buildUrlListTile(),
           _buildAccuracyListTile(),

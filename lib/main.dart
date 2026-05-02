@@ -13,9 +13,16 @@ final messengerKey = GlobalKey<ScaffoldMessengerState>();
 
 const _seedColor = Color(0xFF1A1A1A);
 
+/// Globálny holder UI jazyka. Settings → Language ho prepisuje, MaterialApp
+/// počúva cez `ListenableBuilder` a okamžite prerendruje.
+final ValueNotifier<Locale> appLocale = ValueNotifier<Locale>(const Locale('sk'));
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Preferences.init();
+  appLocale.value = Locale(
+    Preferences.instance.getString(Preferences.language) ?? 'sk',
+  );
   await PasswordService.migrate();
   await GeolocationService.init();
   runApp(const MainApp());
@@ -48,27 +55,31 @@ class _MainAppState extends State<MainApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      scaffoldMessengerKey: messengerKey,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      supportedLocales: AppLocalizations.supportedLocales,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _seedColor,
-          brightness: Brightness.light,
+    return ValueListenableBuilder<Locale>(
+      valueListenable: appLocale,
+      builder: (context, locale, _) => MaterialApp(
+        scaffoldMessengerKey: messengerKey,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: locale,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: _seedColor,
+            brightness: Brightness.light,
+          ),
         ),
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _seedColor,
-          brightness: Brightness.dark,
+        darkTheme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: _seedColor,
+            brightness: Brightness.dark,
+          ),
         ),
-      ),
-      home: Stack(
-        children: const [
-          QuickActionsInitializer(),
-          MainScreen(),
-        ],
+        home: Stack(
+          children: const [
+            QuickActionsInitializer(),
+            MainScreen(),
+          ],
+        ),
       ),
     );
   }

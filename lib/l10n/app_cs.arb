@@ -28,6 +28,7 @@
   "trackingLabel": "Nepřetržité sledování",
   "advancedLabel": "Advanced settings",
   "passwordLabel": "Password",
+  "languageLabel": "Jazyk",
   "optimizationMessage": "To ensure reliable tracking, please disable battery optimization for this app.",
   "passwordError": "Wrong password",
   "startAction": "Spustit službu",

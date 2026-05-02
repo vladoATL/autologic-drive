@@ -28,6 +28,7 @@
   "trackingLabel": "Nepretržité sledovanie",
   "advancedLabel": "Pokročilé nastavenia",
   "passwordLabel": "Heslo",
+  "languageLabel": "Jazyk",
   "optimizationMessage": "Pre spoľahlivé sledovanie vypnite optimalizáciu batérie pre túto aplikáciu.",
   "passwordError": "Nesprávne heslo",
   "startAction": "Spustiť službu",

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.1 — 2026-05-02
+
+Slovak as default UI language + in-app language switcher.
+
+### Added
+- `Preferences.language` key (default `sk`) and a `Settings → Jazyk` tile
+  with a Slovenčina / Čeština / English picker.
+- Global `appLocale` `ValueNotifier<Locale>` in `main.dart` so a language
+  change re-renders the whole app immediately (no restart needed).
+- `languageLabel` ARB string in `app_sk.arb`, `app_cs.arb`, `app_en.arb`.
+
+### Changed
+- `MaterialApp` is now wrapped in a `ValueListenableBuilder<Locale>` and
+  reads its `locale` from the persisted preference, defaulting to Slovak.
+
 ## 0.3.0 — 2026-05-02
 
 Drops the commercial `flutter_background_geolocation` SDK in favour of

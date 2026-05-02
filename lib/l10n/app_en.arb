@@ -28,6 +28,7 @@
   "trackingLabel": "Continuous tracking",
   "advancedLabel": "Advanced settings",
   "passwordLabel": "Password",
+  "languageLabel": "Language",
   "optimizationMessage": "To ensure reliable tracking, please disable battery optimization for this app.",
   "passwordError": "Wrong password",
   "startAction": "Start service",
