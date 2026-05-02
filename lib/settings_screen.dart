@@ -363,6 +363,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: Text(AppLocalizations.of(context)!.passwordLabel),
               onTap: _changePassword,
             ),
+          ListTile(
+            leading: const Icon(Icons.replay),
+            title: Text(AppLocalizations.of(context)!.onboardRerun),
+            onTap: () async {
+              final navigator = Navigator.of(context);
+              await Preferences.instance.setBool(Preferences.onboardingDone, false);
+              needsOnboarding.value = true;
+              if (!mounted) return;
+              navigator.pop();
+            },
+          ),
         ],
       ),
     );

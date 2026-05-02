@@ -29,6 +29,7 @@ class Preferences {
   static const String authCookie = 'auth_cookie';
   static const String authEmail = 'auth_email';
   static const String authUserId = 'auth_user_id';
+  static const String onboardingDone = 'onboarding_done';
 
   static const String lastTimestamp = 'lastTimestamp';
   static const String lastLatitude = 'lastLatitude';
@@ -49,7 +50,7 @@ class Preferences {
         allowList: {
           id, url, accuracy, distance, interval, angle, heartbeat,
           fastestInterval, buffer,  wakelock, stopDetection, password, language, autoDetect,
-          apiUrl, authCookie, authEmail, authUserId,
+          apiUrl, authCookie, authEmail, authUserId, onboardingDone,
           lastTimestamp, lastLatitude, lastLongitude, lastHeading,
           // Trip + vehicles (TripController, VehicleRepository, OsmAndSender):
           'trip_active', 'trip_vehicle_mac', 'trip_started_at', 'trip_source',

@@ -5,6 +5,7 @@ import 'package:autologic_drive/password_service.dart';
 import 'package:autologic_drive/quick_actions.dart';
 import 'package:autologic_drive/trip/bluetooth_watcher.dart';
 import 'package:autologic_drive/trip/trip_controller.dart';
+import 'package:autologic_drive/util/notifications.dart';
 
 import 'auth/traccar_api.dart';
 import 'l10n/app_localizations.dart';
@@ -12,6 +13,7 @@ import 'main_screen.dart';
 import 'preferences.dart';
 import 'configuration_service.dart';
 import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 
 final messengerKey = GlobalKey<ScaffoldMessengerState>();
 
@@ -25,6 +27,10 @@ final ValueNotifier<Locale> appLocale = ValueNotifier<Locale>(const Locale('sk')
 /// rebuilding the whole app.
 final ValueNotifier<bool> isAuthenticated = ValueNotifier<bool>(false);
 
+/// Forces the onboarding wizard to re-appear (e.g. when the user re-runs it
+/// from Settings). Pre-checked at startup against `Preferences.onboardingDone`.
+final ValueNotifier<bool> needsOnboarding = ValueNotifier<bool>(false);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Preferences.init();
@@ -33,9 +39,12 @@ void main() async {
   );
   await PasswordService.migrate();
   await GeolocationService.init();
+  await AppNotifications.init();
   await TripController.restore();
   BluetoothWatcher.start();
   isAuthenticated.value = TraccarApi.isLoggedIn;
+  needsOnboarding.value =
+      !(Preferences.instance.getBool(Preferences.onboardingDone) ?? false);
   runApp(const MainApp());
 }
 
@@ -93,11 +102,21 @@ class _MainAppState extends State<MainApp> {
                 onLoggedIn: () => isAuthenticated.value = true,
               );
             }
-            return Stack(
-              children: const [
-                QuickActionsInitializer(),
-                MainScreen(),
-              ],
+            return ValueListenableBuilder<bool>(
+              valueListenable: needsOnboarding,
+              builder: (context, needs, _) {
+                if (needs) {
+                  return OnboardingScreen(
+                    onFinished: () => needsOnboarding.value = false,
+                  );
+                }
+                return Stack(
+                  children: const [
+                    QuickActionsInitializer(),
+                    MainScreen(),
+                  ],
+                );
+              },
             );
           },
         ),

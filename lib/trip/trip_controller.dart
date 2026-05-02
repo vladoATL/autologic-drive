@@ -8,6 +8,7 @@ library;
 import '../preferences.dart';
 import '../tracking/engine.dart';
 import '../util/app_logger.dart';
+import '../util/notifications.dart';
 import 'trip_state.dart';
 import 'vehicle.dart';
 import 'vehicle_repository.dart';
@@ -83,6 +84,7 @@ class TripController {
       source: source,
     );
     AppLogger.info('Trip started');
+    AppNotifications.showTripStarted(vehicleLabel: vehicle?.label);
   }
 
   static Future<void> stop() async {
@@ -94,10 +96,15 @@ class TripController {
       'Trip stop (vehicle=${tripState.value.vehicleLabel ?? "none"}'
       '${duration != null ? ", duration=${duration.inSeconds}s" : ""})',
     );
+    final stoppedLabel = tripState.value.vehicleLabel;
     await engine.stop();
     await Preferences.instance.setBool(_kActive, false);
     await Preferences.instance.setString(_kVehicleMac, '');
     await Preferences.instance.setString(_kSource, '');
     tripState.value = TripSnapshot.idle;
+    AppNotifications.showTripStopped(
+      vehicleLabel: stoppedLabel,
+      duration: duration,
+    );
   }
 }
