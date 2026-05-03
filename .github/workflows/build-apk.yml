@@ -1,0 +1,67 @@
+name: build-apk
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed to create / update GitHub Releases on tag
+
+jobs:
+  build:
+    name: flutter build apk (debug)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show Flutter version
+        run: flutter --version
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter build apk --debug
+        run: flutter build apk --debug
+
+      - name: Rename APK with version
+        id: rename
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          mkdir -p artifacts
+          cp build/app/outputs/flutter-apk/app-debug.apk \
+             "artifacts/autologic-drive-${VERSION}-debug.apk"
+          echo "apk=artifacts/autologic-drive-${VERSION}-debug.apk" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autologic-drive-${{ steps.rename.outputs.version }}-debug
+          path: ${{ steps.rename.outputs.apk }}
+          retention-days: 30
+
+      - name: Attach APK to GitHub Release (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.rename.outputs.apk }}
+          generate_release_notes: true
