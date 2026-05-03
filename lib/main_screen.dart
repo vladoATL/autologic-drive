@@ -290,16 +290,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE8F0FE),
               ),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  'AutoLogic Drive',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                      ),
+              child: Center(
+                child: Image.asset(
+                  'assets/icon/autologic_kj_logo.png',
+                  fit: BoxFit.contain,
                 ),
               ),
             ),

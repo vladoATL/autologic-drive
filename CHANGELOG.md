@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.9.2 — 2026-05-03
+
+License-clean branding refresh.
+
+### Changed
+- Launcher icon (`assets/icon/autologic_icon.png`) replaced with the new
+  `favicons/android-chrome-512x512.png` master from
+  `starlogic-autologic/images/`. The previous icon was withdrawn for
+  licensing reasons. `flutter_launcher_icons` regenerated all five
+  Android density buckets.
+- Notification small-icon (`ic_stat_notify`) re-rendered into all five
+  drawables from the new alpha-only `autologic_icon-192.png` master.
+- **Drawer header** now shows the **AutoLogic KJ logo** (square mark)
+  on a brand-blue (`#E8F0FE`) background instead of a solid colour
+  block with the *AutoLogic Drive* text — cleaner brand presentation
+  on every drawer open.
+
+### Added
+- `assets/icon/autologic_kj_logo.png` asset (256×256) used by the
+  drawer header.
+
 ## 0.9.1 — 2026-05-02
 
 Trip-detail polish based on real-driving feedback.
