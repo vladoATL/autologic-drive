@@ -27,10 +27,12 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // TODO(0.9.x): remove dev-prefill before release.
   final _emailCtrl = TextEditingController(
-    text: Preferences.instance.getString(Preferences.authEmail) ?? '',
+    text: Preferences.instance.getString(Preferences.authEmail) ?? 'vlado@starlogic.net',
   );
-  final _passwordCtrl = TextEditingController();
+  // TODO(0.9.x): remove dev-prefill before release.
+  final _passwordCtrl = TextEditingController(text: 'Slovensko12');
   bool _busy = false;
   bool _obscurePassword = true;
   bool _rememberMe = true;
@@ -157,7 +159,14 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = AppLocalizations.of(context)!.qrInvalid);
       return;
     }
-    await ConfigurationService.applyUri(uri);
+    final paired = await ConfigurationService.applyUri(uri);
+    if (paired) {
+      // Backend pair succeeded — driver is authenticated, skip the password
+      // form entirely.
+      if (!mounted) return;
+      widget.onLoggedIn();
+      return;
+    }
     final email = Preferences.instance.getString(Preferences.authEmail);
     if (email != null) _emailCtrl.text = email;
     if (!mounted) return;

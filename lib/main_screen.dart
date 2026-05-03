@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:autologic_drive/auth/backend_api.dart';
 import 'package:autologic_drive/auth/traccar_api.dart';
 import 'package:autologic_drive/main.dart';
 import 'package:autologic_drive/password_service.dart';
@@ -290,13 +291,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Color(0xFFE8F0FE),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
               ),
               child: Center(
-                child: Image.asset(
-                  'assets/icon/autologic_kj_logo.png',
-                  fit: BoxFit.contain,
+                child: ColorFiltered(
+                  colorFilter: ColorFilter.mode(
+                    Theme.of(context).colorScheme.onPrimary,
+                    BlendMode.srcIn,
+                  ),
+                  child: Image.asset(
+                    'assets/icon/autologic_kj_logo.png',
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
@@ -374,6 +381,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                   await TripController.stop();
                 }
                 await TraccarApi.logout();
+                await BackendApi.logout();
                 isAuthenticated.value = false;
               },
             ),

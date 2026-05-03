@@ -1,5 +1,121 @@
 # Changelog
 
+## 0.10.0 — 2026-05-03
+
+First integration with the AutoLogic Backend (.NET 10) — paves the way for
+manager-issued QR onboarding without anyone touching Traccar's UI.
+
+### Added
+- **`BackendApi`** ([lib/auth/backend_api.dart](lib/auth/backend_api.dart)) —
+  thin client for the new `/api/v1/auth/*` endpoints:
+  `pair(token)` exchanges a one-time onboarding token for a JWT pair,
+  `login(email, password)` is the email/password equivalent,
+  `me()` fetches the authenticated user identity (id, tenantId, email, name,
+  role) and caches it into `Preferences`,
+  `refresh()` rotates the refresh token,
+  `logout()` revokes it server-side and wipes local state.
+- **Backend session prefs** in `Preferences`: `backend_access_token`,
+  `backend_refresh_token`, `backend_access_expires_at`, `backend_user_id`,
+  `backend_tenant_id`, `backend_role`.
+- **Deep-link `token=` parameter** in `ConfigurationService.applyUri`.
+  When the QR / `autologic-drive://configure?...` link carries a token,
+  the app now exchanges it for a backend session and considers the driver
+  authenticated automatically — no manual password step required.
+  `applyUri` now returns `bool` (`true` when a backend pair succeeded).
+
+### Changed
+- **Auth gate** in `main.dart` flips `isAuthenticated` on either
+  `TraccarApi.isLoggedIn` *or* `BackendApi.isPaired`.
+- **Logout** in `main_screen` now also calls `BackendApi.logout()` so the
+  driver is fully signed out of both worlds.
+- **Login screen** dismisses itself directly after a successful QR pair
+  instead of waiting for the user to type credentials.
+
+### Notes
+- Direct Traccar `/api/session` login still works for users who don't have
+  a QR — the two paths are independent until a future release retires the
+  Traccar cookie path entirely.
+- Token refresh is implemented but not yet plugged into HTTP retries.
+
+## 0.9.5 — 2026-05-03
+
+Trip-quality + odometer UX fixes from first real-world test drive.
+
+### Fixed
+- **Ghost trips** (BT flap on parking lot, 0 m moved) are now dropped on
+  stop even when no GPS fix was captured at the start. Drop trigger:
+  start coord missing AND duration < 90 s. Previously these slipped
+  through because the distance check was skipped on `null` distance.
+- **Tacho po auto-fill self-poisoning**: typing the first digit of
+  Tacho pred used to write that digit into Tacho po, which the controller
+  listener immediately marked as "manually edited", freezing all
+  subsequent auto-fills. Replaced the listener with a `TextField.onChanged`
+  handler that only fires on real user input.
+
+### Added
+- **Tacho pred pre-fill** from the previous completed trip's Tacho po
+  for the same vehicle. New trip detail opens with the start odometer
+  already populated; driver only confirms or overrides.
+- **Activity Recognition** permission (`android.permission.ACTIVITY_RECOGNITION`)
+  added to manifest and requested as the third dialog in the onboarding
+  location step. Without it Tracelet's motion detector falls back to a
+  conservative always-sample mode and trip-start lags by tens of seconds.
+
+### Deferred to 0.9.6
+- Native manifest-declared BT BroadcastReceiver + persistent foreground
+  monitoring service (so trips auto-start while the app process is
+  killed). Larger native-Kotlin work than originally scoped — kept
+  separate to avoid regressing the working BT flow before more testing.
+- Trip-merging (collapse multiple BT sessions with short gaps into one
+  trip — courier use case).
+
+## 0.9.4 — 2026-05-03
+
+UX polish + local-data retention.
+
+### Changed
+- **Onboarding welcome icon** no longer tinted with `colorScheme.onSurface`
+  (was rendering as a flat white/black silhouette). Shows the AutoLogic
+  icon in its native colours, matching the rest of the wizard steps.
+- **Drawer header background** swapped from the near-white `#E8F0FE` to
+  the saturated brand blue `#1A73E8`, matching the in-app icon palette.
+- **Settings → Minimálna dĺžka jazdy** moved out of a `ListTile` subtitle
+  into a full-width `Card` with the current value shown in the header
+  and the slider at full height — was effectively invisible / clipped
+  in the previous layout.
+
+### Added
+- **Settings → Uchovávať jazdy** retention dropdown
+  (30 / 60 / 90 / 180 / 365 / Nikdy, default 60 days). On every app
+  start `TripRepository.purgeOlderThan` deletes completed trips older
+  than the threshold; active (unended) trips are always kept.
+
+## 0.9.3 — 2026-05-03
+
+Reverse-geocoded addresses in the trip log + minimum-trip-distance
+guard against false-positive parking-lot trips.
+
+### Added
+- **Reverse-geocoded start/end addresses** in the trip log:
+  - Stored in two new columns (`start_address`, `end_address`) on the
+    `trips` table — schema bumped to v2 with an `ALTER TABLE ADD COLUMN`
+    migration that preserves existing rows.
+  - Resolved on demand via `geocoding: ^3.0.0` (Android `Geocoder` API,
+    Slovak locale) and cached after the first resolve, so repeat opens
+    of the trip detail are instant and the CSV export works offline.
+  - Visible in **TripDetailScreen** (Štart / Cieľ rows under the time
+    range), in the **Kniha jázd** list (compact `start → end` line in
+    the subtitle), and in **CSV export** (two new columns *Štart adresa*
+    and *Cieľ adresa* before the raw coordinates).
+- **Settings → Minimálna dĺžka jazdy** slider (0–1000 m, default
+  200 m). Trips with a straight-line start→end distance below the
+  threshold are dropped on stop without a notification — silences the
+  false-positives that come from shuffling around a parking spot or
+  a brief A2DP reconnect.
+- `TripController` now populates `distance_km` with the great-circle
+  (Haversine) start→end distance on stop. Good enough for the
+  odometer-end auto-fill in TripDetailScreen.
+
 ## 0.9.2 — 2026-05-03
 
 License-clean branding refresh.

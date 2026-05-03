@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:app_links/app_links.dart';
 import 'package:autologic_drive/geolocation_service.dart';
@@ -5,8 +7,10 @@ import 'package:autologic_drive/password_service.dart';
 import 'package:autologic_drive/quick_actions.dart';
 import 'package:autologic_drive/trip/bluetooth_watcher.dart';
 import 'package:autologic_drive/trip/trip_controller.dart';
+import 'package:autologic_drive/trip/trip_repository.dart';
 import 'package:autologic_drive/util/notifications.dart';
 
+import 'auth/backend_api.dart';
 import 'auth/traccar_api.dart';
 import 'l10n/app_localizations.dart';
 import 'main_screen.dart';
@@ -49,7 +53,13 @@ void main() async {
     TripController.restore(),
   ]);
   BluetoothWatcher.start();
-  isAuthenticated.value = TraccarApi.isLoggedIn;
+  // Fire-and-forget: prune trips older than the configured retention window.
+  // Active (unended) trips are always kept.
+  unawaited(TripRepository.purgeOlderThan(
+    Preferences.instance.getInt(Preferences.tripRetentionDays) ??
+        Preferences.defaultTripRetentionDays,
+  ));
+  isAuthenticated.value = TraccarApi.isLoggedIn || BackendApi.isPaired;
   needsOnboarding.value =
       !(Preferences.instance.getBool(Preferences.onboardingDone) ?? false);
   runApp(const MainApp());
@@ -73,10 +83,12 @@ class _MainAppState extends State<MainApp> {
     final appLinks = AppLinks();
     final uri = await appLinks.getInitialLink();
     if (uri != null) {
-      await ConfigurationService.applyUri(uri);
+      final paired = await ConfigurationService.applyUri(uri);
+      if (paired) isAuthenticated.value = true;
     }
     appLinks.uriLinkStream.listen((uri) async {
-      await ConfigurationService.applyUri(uri);
+      final paired = await ConfigurationService.applyUri(uri);
+      if (paired) isAuthenticated.value = true;
     });
   }
 

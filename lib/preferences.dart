@@ -30,7 +30,21 @@ class Preferences {
   static const String authEmail = 'auth_email';
   static const String authUserId = 'auth_user_id';
   static const String driverName = 'driver_name';
+  // AutoLogic Backend (.NET) tokens — separate from Traccar /api/session.
+  // Set when the user is paired via QR or logs in through /api/v1/auth/login.
+  static const String backendAccessToken = 'backend_access_token';
+  static const String backendRefreshToken = 'backend_refresh_token';
+  static const String backendAccessExpiresAt = 'backend_access_expires_at';
+  static const String backendUserId = 'backend_user_id';
+  static const String backendTenantId = 'backend_tenant_id';
+  static const String backendRole = 'backend_role';
   static const String onboardingDone = 'onboarding_done';
+  static const String minTripDistanceMeters = 'min_trip_distance_m';
+  static const int defaultMinTripDistanceMeters = 200;
+  static const String tripRetentionDays = 'trip_retention_days';
+  static const int defaultTripRetentionDays = 60;
+  /// Sentinel for "never delete" — stored as -1 in the pref.
+  static const int tripRetentionNever = -1;
 
   static const String lastTimestamp = 'lastTimestamp';
   static const String lastLatitude = 'lastLatitude';
@@ -52,6 +66,10 @@ class Preferences {
           id, url, accuracy, distance, interval, angle, heartbeat,
           fastestInterval, buffer,  wakelock, stopDetection, password, language, autoDetect,
           apiUrl, authCookie, authEmail, authUserId, driverName, onboardingDone,
+          backendAccessToken, backendRefreshToken, backendAccessExpiresAt,
+          backendUserId, backendTenantId, backendRole,
+          minTripDistanceMeters,
+          tripRetentionDays,
           lastTimestamp, lastLatitude, lastLongitude, lastHeading,
           // Trip + vehicles (TripController, VehicleRepository, OsmAndSender):
           'trip_active', 'trip_vehicle_mac', 'trip_started_at', 'trip_source',
