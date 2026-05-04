@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.14.0 — 2026-05-04
+
+UX overhaul from the 2026-05-04 morning test (Batch 2).
+
+### Added
+- **`TripFieldsEditor`** ([lib/screens/widgets/trip_fields_editor.dart](lib/screens/widgets/trip_fields_editor.dart)) —
+  reusable widget hosting the kniha-jázd form (driver autocomplete,
+  purpose + chips, business/private, odometer pred/po). Auto-saves to
+  SQLite with an 800 ms debounce, so no Save button is needed.
+- **Inline editor on `MainScreen` during an active trip.** When a trip
+  is running, the trip card now embeds `TripFieldsEditor` for the
+  active record id directly under the GPS / vehicle status. Driver
+  can fill in tacho pred and purpose without navigating into
+  `TripDetailScreen`.
+- **`VehicleRepository.setPrimaryAutoStart(mac)`** — promotes one
+  paired BT device as the single auto-start trigger and clears
+  `autoStartTrip` on every other vehicle. Stops the SmartBox + Karoq
+  tug-of-war that caused trip flapping on real drives.
+
+### Changed
+- **`VehiclesScreen` + onboarding vehicles step** now render
+  `RadioListTile` instead of `SwitchListTile` — there is exactly one
+  primary auto-start vehicle at any time, and tapping the radio on a
+  different car flips the others off.
+- **`TripDetailScreen`** dropped its inline form and Save button; both
+  responsibilities moved into `TripFieldsEditor`. Header card with
+  vehicle / time / distance / addresses and the delete action stay.
+- **`AppNotifications.consumeColdLaunch()`** captures the trip id from
+  a notification tap that woke the app from a killed state. `MainScreen.initState`
+  picks it up via `takePendingDeepLinkTripId` and pushes
+  `TripDetailScreen` on the first frame — fixes the bug where tapping
+  *"Doplň tacho"* on a fresh launch landed on the home screen with the
+  Stop button instead of on the editable trip fields.
+
+## 0.13.3 — 2026-05-04
+
+Real-drive fixes from the 2026-05-04 morning test (Batch 1).
+
+### Fixed
+- **Backend token auto-refresh.** The access token expires after ~1 hour
+  and there was no recovery, so `PositionSender` and `TripSync` started
+  spamming HTTP 401 every 30 s for the rest of the day. New
+  `BackendApi.getValidAccessToken()` checks `backendAccessExpiresAt` and
+  triggers `refresh()` on demand (with a 30 s safety margin); a separate
+  `BackendApi.refreshAfterUnauthorized()` is the explicit retry hook for
+  401 responses. Added `BackendApi.isSessionDead` flag — once a refresh
+  fails, both senders skip silently instead of flooding the log. The flag
+  resets on next successful pair / login / refresh.
+- **Android Auto disconnect → trip auto-stop.** `MonitorService`'s
+  `CarConnection` observer now also emits on `NOT_CONNECTED`, and
+  `BluetoothWatcher._onAndroidAutoDisconnected` applies the same 15 s
+  flap grace + still-connected re-poll as the BT path. AA-only trips no
+  longer hang open after the driver unplugs the cable.
+- **`monitorServiceEnabled` defaulted to true on fresh install.**
+  Previously the pref was missing on first launch; `MainActivity` read
+  the absent key as "user opted out" and skipped starting `MonitorService`,
+  so the very first jazda after onboarding never triggered. Toggling the
+  Settings switch off/on used to be the only fix.
+
 ## 0.13.2 — 2026-05-04
 
 Hotfix for 0.13.1: `backend_api_url` was missing from the

@@ -32,6 +32,26 @@ class VehicleRepository {
     await _syncTraccarDeviceName();
   }
 
+  /// Promote one paired BT device to be the single auto-start trigger.
+  /// Every other vehicle has `autoStartTrip` cleared so we don't get
+  /// trip-flapping from a SmartBox/OBD reader competing with the head-unit.
+  /// Pass an empty string to clear all auto-start flags.
+  static Future<void> setPrimaryAutoStart(String mac) async {
+    final list = all().toList();
+    var changed = false;
+    for (var i = 0; i < list.length; i++) {
+      final v = list[i];
+      final shouldBeOn = v.bluetoothMac == mac;
+      if (v.autoStartTrip != shouldBeOn) {
+        list[i] = v.copyWith(autoStartTrip: shouldBeOn);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    await Preferences.instance.setString(_prefsKey, Vehicle.encodeList(list));
+    await _syncTraccarDeviceName();
+  }
+
   static Future<void> remove(String mac) async {
     final list = all().where((v) => v.bluetoothMac != mac).toList();
     await Preferences.instance.setString(_prefsKey, Vehicle.encodeList(list));

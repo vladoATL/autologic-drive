@@ -104,6 +104,10 @@ class Preferences {
       await instance.setString(language, 'sk');
       await instance.setString(apiUrl, kAutoLogicServer.apiUrl);
       await instance.setString(backendApiUrl, kAutoLogicServer.backendApiUrl);
+      // Default the background BT/AA monitor ON for fresh installs so
+      // killed-app detection works on the very first jazda — without this
+      // the user has to toggle it once in Settings to seed the pref.
+      await instance.setBool(monitorServiceEnabled, true);
     }
     // Migration: pre-0.5.0 installs don't have apiUrl seeded.
     final existingApi = instance.getString(apiUrl);

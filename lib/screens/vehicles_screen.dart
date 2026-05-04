@@ -107,18 +107,28 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 ),
               ],
             ),
-            SwitchListTile(
+            // Single-select across all paired devices: tapping the radio
+            // promotes this BT to the trigger and clears every other
+            // vehicle's autoStartTrip. Stops the SmartBox + Karoq tug-of-war
+            // that caused trips to flap on the 2026-05-04 morning test.
+            RadioListTile<String>(
               contentPadding: EdgeInsets.zero,
               title: Text(AppLocalizations.of(context)!.vehicleAutoStartLabel),
               subtitle: Text(
                 AppLocalizations.of(context)!.vehicleAutoStartHint,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-              value: vehicle.autoStartTrip,
-              onChanged: (v) async {
-                await VehicleRepository.upsert(
-                  vehicle.copyWith(autoStartTrip: v),
-                );
+              value: d.address,
+              groupValue: VehicleRepository.all()
+                  .where((v) => v.autoStartTrip)
+                  .map((v) => v.bluetoothMac)
+                  .firstOrNull,
+              onChanged: (selected) async {
+                if (selected == null) return;
+                if (!paired) {
+                  await VehicleRepository.upsert(vehicle);
+                }
+                await VehicleRepository.setPrimaryAutoStart(selected);
                 if (mounted) setState(() {});
               },
             ),

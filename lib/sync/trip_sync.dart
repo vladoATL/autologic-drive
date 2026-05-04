@@ -61,28 +61,46 @@ class TripSync {
       return const TripSyncReport(sent: 0, acknowledged: 0, rejected: 0);
     }
 
+    if (BackendApi.isSessionDead) {
+      return const TripSyncReport(sent: 0, acknowledged: 0, rejected: 0);
+    }
+
     final url = Uri.parse(
       '${Preferences.instance.getString(Preferences.backendApiUrl) ?? ''}/api/v1/trips/sync',
     );
     final body = jsonEncode({
       'trips': pending.map(_toDto).toList(),
     });
-    final accessToken =
-        Preferences.instance.getString(Preferences.backendAccessToken) ?? '';
-    if (accessToken.isEmpty) {
+    var accessToken = await BackendApi.getValidAccessToken();
+    if (accessToken == null) {
       return const TripSyncReport(sent: 0, acknowledged: 0, rejected: 0);
     }
 
-    final http.Response resp;
+    Future<http.Response> doPost(String t) => http.post(
+          url,
+          headers: {
+            HttpHeaders.contentTypeHeader: 'application/json',
+            HttpHeaders.authorizationHeader: 'Bearer $t',
+          },
+          body: body,
+        );
+
+    http.Response resp;
     try {
-      resp = await http.post(
-        url,
-        headers: {
-          HttpHeaders.contentTypeHeader: 'application/json',
-          HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-        },
-        body: body,
-      );
+      resp = await doPost(accessToken);
+      if (resp.statusCode == 401) {
+        final fresh = await BackendApi.refreshAfterUnauthorized();
+        if (fresh == null) {
+          return TripSyncReport(
+            sent: pending.length,
+            acknowledged: 0,
+            rejected: 0,
+            error: 'session_dead',
+          );
+        }
+        accessToken = fresh;
+        resp = await doPost(accessToken);
+      }
     } catch (e) {
       AppLogger.warn('TripSync push failed (network): $e');
       return TripSyncReport(
@@ -94,7 +112,7 @@ class TripSync {
     }
 
     if (resp.statusCode == 401) {
-      AppLogger.warn('TripSync: 401 — backend access token expired');
+      AppLogger.warn('TripSync: 401 even after refresh — session dead');
       return TripSyncReport(
         sent: pending.length,
         acknowledged: 0,

@@ -88,9 +88,14 @@ class BluetoothWatcher {
     // MAC, just the synthetic "android-auto" address. Treat as a strong
     // "user is in a vehicle" signal and start a trip with the first
     // auto-start vehicle if none is already running.
-    if (profile == 'android_auto' && state == 'connected') {
-      AppLogger.info('Android Auto connected — checking for trip-start');
-      await _onAndroidAutoConnected();
+    if (profile == 'android_auto') {
+      if (state == 'connected') {
+        AppLogger.info('Android Auto connected — checking for trip-start');
+        await _onAndroidAutoConnected();
+      } else if (state == 'disconnected') {
+        AppLogger.info('Android Auto disconnected — checking for trip-stop');
+        await _onAndroidAutoDisconnected();
+      }
       return;
     }
 
@@ -128,6 +133,51 @@ class BluetoothWatcher {
       vehicle: vehicle,
       source: TripTriggerSource.androidAuto,
     );
+  }
+
+  /// AA disconnect → schedule an auto-stop with the same 15 s grace as BT.
+  /// We respect the trip source so a manual trip isn't terminated by AA
+  /// going offline, and we re-poll for any other auto-trigger device still
+  /// connected (e.g. car BT).
+  static Future<void> _onAndroidAutoDisconnected() async {
+    final current = tripState.value;
+    if (!current.active) return;
+    if (current.source != TripTriggerSource.androidAuto &&
+        current.source != TripTriggerSource.bluetooth) {
+      AppLogger.info('AA disconnect — trip is manual, leave running');
+      return;
+    }
+    AppLogger.info(
+      'AA disconnect — waiting ${_disconnectGrace.inSeconds}s before stopping trip',
+    );
+    _disconnectGraceTimer?.cancel();
+    _disconnectGraceTimer = Timer(_disconnectGrace, () async {
+      _disconnectGraceTimer = null;
+      // If a known BT vehicle is still connected, the trip is genuinely
+      // continuing (driver just unplugged the AA cable, not left the car).
+      try {
+        final raw = await _methodsChannel
+            .invokeMethod<List<dynamic>>('connectedDevices');
+        final addresses = (raw ?? const []).cast<String>().toSet();
+        final stillConnectedKnown = addresses
+            .map(VehicleRepository.findByMac)
+            .whereType<Vehicle>()
+            .where((v) => v.autoStartTrip)
+            .toList();
+        if (stillConnectedKnown.isNotEmpty) {
+          AppLogger.info(
+            'AA grace expired but BT still connected: '
+            '${stillConnectedKnown.map((v) => v.label).join(", ")} — keep trip',
+          );
+          return;
+        }
+      } catch (error) {
+        AppLogger.warn('AA grace re-poll failed, stopping anyway: $error');
+      }
+      if (!tripState.value.active) return;
+      AppLogger.info('AA auto-stop after grace');
+      await TripController.stop();
+    });
   }
 
   static Future<void> _handle({

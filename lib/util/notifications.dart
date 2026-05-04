@@ -68,11 +68,44 @@ class AppNotifications {
   /// Set by `main.dart` so the notification tap can navigate.
   static GlobalKey<NavigatorState>? navigatorKey;
 
+  /// Trip id captured from a cold-launch notification tap (app was killed
+  /// when the user pressed the notification). Consumed once after the
+  /// navigator is mounted, then cleared.
+  static String? _pendingDeepLinkTripId;
+
+  /// Called from `main.dart` after `init()` so a notification tap that
+  /// woke the app from a killed state still ends up on `TripDetailScreen`.
+  /// `_onTap` only fires while the engine is alive — cold-launch taps go
+  /// through `getNotificationAppLaunchDetails()` instead.
+  static Future<void> consumeColdLaunch() async {
+    if (!Platform.isAndroid) return;
+    final details = await _plugin.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp == true) {
+      final payload = details?.notificationResponse?.payload;
+      if (payload != null && payload.isNotEmpty) {
+        _pendingDeepLinkTripId = payload;
+      }
+    }
+  }
+
+  /// Pop and consume any pending cold-launch trip id. Returns the id once;
+  /// subsequent calls return null until a new notification taps in.
+  static String? takePendingDeepLinkTripId() {
+    final id = _pendingDeepLinkTripId;
+    _pendingDeepLinkTripId = null;
+    return id;
+  }
+
   static void _onTap(NotificationResponse response) {
     final tripId = response.payload;
     if (tripId == null || tripId.isEmpty) return;
     final state = navigatorKey?.currentState;
-    if (state == null) return;
+    if (state == null) {
+      // Navigator isn't mounted yet (app booting up). Stash the id so the
+      // first frame can pick it up via takePendingDeepLinkTripId().
+      _pendingDeepLinkTripId = tripId;
+      return;
+    }
     state.push(MaterialPageRoute(
       builder: (_) => TripDetailScreen(tripId: tripId),
     ));

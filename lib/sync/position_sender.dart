@@ -115,10 +115,17 @@ class PositionSender {
     final buf = _buffers[tripId];
     if (buf == null || buf.isEmpty) return 0;
     if (!BackendApi.isPaired) return 0;
+    // Stop hammering the backend (and the log) once we know the session
+    // can't be refreshed. Drop the buffer — Traccar still has these via the
+    // OsmAnd sink, so nothing is "lost" beyond the Web Admin polyline.
+    if (BackendApi.isSessionDead) {
+      _buffers.remove(tripId);
+      return 0;
+    }
 
     final base = Preferences.instance.getString(Preferences.backendApiUrl);
-    final token = Preferences.instance.getString(Preferences.backendAccessToken);
-    if (base == null || base.isEmpty || token == null || token.isEmpty) {
+    var token = await BackendApi.getValidAccessToken();
+    if (base == null || base.isEmpty || token == null) {
       return 0;
     }
 
@@ -130,20 +137,32 @@ class PositionSender {
       'positions': batch.map((e) => e.toJson()).toList(),
     });
 
+    Future<http.Response> doPost(String t) => http
+        .post(
+          Uri.parse('$base/api/v1/positions'),
+          headers: {
+            HttpHeaders.contentTypeHeader: 'application/json',
+            HttpHeaders.authorizationHeader: 'Bearer $t',
+          },
+          body: body,
+        )
+        .timeout(_httpTimeout);
+
     try {
-      final resp = await http
-          .post(
-            Uri.parse('$base/api/v1/positions'),
-            headers: {
-              HttpHeaders.contentTypeHeader: 'application/json',
-              HttpHeaders.authorizationHeader: 'Bearer $token',
-            },
-            body: body,
-          )
-          .timeout(_httpTimeout);
+      var resp = await doPost(token);
+      // 401 fallback: token might have expired between getValidAccessToken
+      // and the POST landing. Refresh once and retry; if still 401 the
+      // session is dead and getValidAccessToken will block subsequent calls.
+      if (resp.statusCode == 401) {
+        final fresh = await BackendApi.refreshAfterUnauthorized();
+        if (fresh == null) {
+          _buffers.remove(tripId);
+          return 0;
+        }
+        token = fresh;
+        resp = await doPost(token);
+      }
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        // Remove the snapshot from the head of the buffer; anything that
-        // arrived during the POST stays for the next flush.
         buf.removeRange(0, batch.length);
         if (buf.isEmpty) _buffers.remove(tripId);
         AppLogger.info(

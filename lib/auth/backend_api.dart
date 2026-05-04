@@ -44,6 +44,65 @@ class BackendApi {
   /// the token's signature or expiry — call [me] for an authoritative check.
   static bool get isPaired => _accessToken != null;
 
+  /// Set to `true` once a refresh attempt fails — stops the per-30s flush
+  /// loop from spamming hopeless 401s into the log. Cleared on successful
+  /// pair / login / refresh.
+  static bool _sessionDead = false;
+
+  /// True iff a previous refresh attempt failed and we shouldn't keep
+  /// hammering the backend until the user logs in again.
+  static bool get isSessionDead => _sessionDead;
+
+  /// Return an access token guaranteed not to be expired (within a 30 s
+  /// safety margin). Triggers a [refresh] if the stored token is past
+  /// `backendAccessExpiresAt`. Returns null when there is no refresh token,
+  /// when refresh fails, or when the session has been marked dead.
+  ///
+  /// Callers (PositionSender, TripSync, …) should treat null as "skip this
+  /// HTTP call quietly" — do NOT log noisy errors on every flush tick.
+  static Future<String?> getValidAccessToken() async {
+    if (_sessionDead) return null;
+    final current = _accessToken;
+    if (current == null) return null;
+    final expiresStr =
+        Preferences.instance.getString(Preferences.backendAccessExpiresAt);
+    if (expiresStr != null && expiresStr.isNotEmpty) {
+      final exp = DateTime.tryParse(expiresStr);
+      if (exp != null &&
+          exp.isAfter(DateTime.now().add(const Duration(seconds: 30)))) {
+        return current;
+      }
+    }
+    final pair = await refresh();
+    if (pair == null) {
+      AppLogger.warn('Backend session dead — refresh failed, will not retry until next login');
+      _sessionDead = true;
+      return null;
+    }
+    return pair.accessToken;
+  }
+
+  /// One-shot retry on 401: ask the backend for a fresh token and rebuild
+  /// the headers. Returns null if the refresh failed (caller should give up
+  /// quietly). Use this from the body of any 401 branch, e.g.:
+  /// ```
+  /// if (resp.statusCode == 401) {
+  ///   final fresh = await BackendApi.refreshAfterUnauthorized();
+  ///   if (fresh == null) return giveUp;
+  ///   resp = await http.post(url, headers: { 'Authorization': 'Bearer $fresh' }, ...);
+  /// }
+  /// ```
+  static Future<String?> refreshAfterUnauthorized() async {
+    if (_sessionDead) return null;
+    final pair = await refresh();
+    if (pair == null) {
+      AppLogger.warn('Backend session dead after 401 — refresh failed');
+      _sessionDead = true;
+      return null;
+    }
+    return pair.accessToken;
+  }
+
   static Map<String, String> _headers({bool authed = false, String? contentType}) {
     final h = <String, String>{};
     if (contentType != null) h[HttpHeaders.contentTypeHeader] = contentType;
@@ -73,6 +132,7 @@ class BackendApi {
       jsonDecode(resp.body) as Map<String, dynamic>,
     );
     await pair.save();
+    _sessionDead = false;
     AppLogger.info('Backend pair OK');
     return pair;
   }
@@ -95,6 +155,7 @@ class BackendApi {
       jsonDecode(resp.body) as Map<String, dynamic>,
     );
     await pair.save();
+    _sessionDead = false;
     AppLogger.info('Backend login OK: $email');
     return pair;
   }
@@ -137,6 +198,7 @@ class BackendApi {
       jsonDecode(resp.body) as Map<String, dynamic>,
     );
     await pair.save();
+    _sessionDead = false;
     return pair;
   }
 

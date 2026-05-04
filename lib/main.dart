@@ -45,6 +45,9 @@ void main() async {
     Preferences.instance.getString(Preferences.language) ?? 'sk',
   );
   AppNotifications.navigatorKey = navigatorKey;
+  // Cold-launch notification tap: pre-load the trip id so MainScreen can
+  // immediately push TripDetailScreen on first frame.
+  unawaited(AppNotifications.consumeColdLaunch());
   // PasswordService.migrate, GeolocationService.init, AppNotifications.init
   // and TripController.restore all read from `Preferences` (already done) but
   // don't depend on each other — run them concurrently to shave cold-start.

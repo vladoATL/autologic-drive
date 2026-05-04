@@ -283,18 +283,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 ),
               ],
             ),
-            SwitchListTile(
+            RadioListTile<String>(
               contentPadding: EdgeInsets.zero,
               title: Text(loc.vehicleAutoStartLabel),
               subtitle: Text(
                 loc.vehicleAutoStartHint,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-              value: vehicle.autoStartTrip,
-              onChanged: (v) async {
-                await VehicleRepository.upsert(
-                  vehicle.copyWith(autoStartTrip: v),
-                );
+              value: d.address,
+              groupValue: VehicleRepository.all()
+                  .where((v) => v.autoStartTrip)
+                  .map((v) => v.bluetoothMac)
+                  .firstOrNull,
+              onChanged: (selected) async {
+                if (selected == null) return;
+                if (!paired) {
+                  await VehicleRepository.upsert(vehicle);
+                }
+                await VehicleRepository.setPrimaryAutoStart(selected);
                 if (mounted) setState(() {});
               },
             ),

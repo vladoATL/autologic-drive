@@ -191,17 +191,28 @@ class MonitorService : LifecycleService() {
         val cc = CarConnection(applicationContext)
         carConnection = cc
         val obs = Observer<Int> { type ->
-            // Only emit on transitions to CONNECTED; debounce repeats.
+            // Only emit on transitions; debounce repeats.
             if (type == lastCarType) return@Observer
+            val previous = lastCarType
             lastCarType = type
-            if (type == CarConnection.CONNECTION_TYPE_PROJECTION ||
+            val nowConnected = type == CarConnection.CONNECTION_TYPE_PROJECTION ||
                 type == CarConnection.CONNECTION_TYPE_NATIVE
-            ) {
-                // Android Auto / Automotive OS came online. Use a synthetic
-                // "address" so Dart can recognise this isn't a BT MAC.
+            val wasConnected = previous == CarConnection.CONNECTION_TYPE_PROJECTION ||
+                previous == CarConnection.CONNECTION_TYPE_NATIVE
+            if (nowConnected) {
+                // Android Auto / Automotive OS came online.
                 EngineChannels.emit(
                     address = "android-auto",
                     state = BluetoothProfile.STATE_CONNECTED,
+                    profile = "android_auto"
+                )
+            } else if (wasConnected && type == CarConnection.CONNECTION_TYPE_NOT_CONNECTED) {
+                // AA went offline — driver unplugged head-unit. Hand off to
+                // BluetoothWatcher to apply the same grace + auto-stop logic
+                // it uses for BT disconnects.
+                EngineChannels.emit(
+                    address = "android-auto",
+                    state = BluetoothProfile.STATE_DISCONNECTED,
                     profile = "android_auto"
                 )
             }

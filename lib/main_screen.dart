@@ -11,12 +11,15 @@ import 'package:autologic_drive/preferences.dart';
 import 'package:autologic_drive/tracking/engine.dart';
 
 import 'l10n/app_localizations.dart';
+import 'screens/trip_detail_screen.dart';
 import 'screens/trips_screen.dart';
 import 'screens/vehicles_screen.dart';
+import 'screens/widgets/trip_fields_editor.dart';
 import 'settings_screen.dart';
 import 'status_screen.dart';
 import 'trip/bluetooth_watcher.dart';
 import 'trip/trip_controller.dart';
+import 'util/notifications.dart';
 import 'trip/trip_state.dart';
 import 'trip/vehicle.dart';
 import 'trip/vehicle_repository.dart';
@@ -37,6 +40,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadVersion();
+    // If we were cold-launched from a trip notification tap, push the
+    // trip detail screen on top so the driver lands directly on the
+    // odometer / purpose form rather than the main home with the Stop
+    // button.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final tripId = AppNotifications.takePendingDeepLinkTripId();
+      if (tripId != null && mounted) {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => TripDetailScreen(tripId: tripId),
+        ));
+      }
+    });
   }
 
   Future<void> _loadVersion() async {
@@ -233,6 +248,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: _LiveDuration(startedAt: trip.startedAt!),
                 ),
+            ],
+            // Inline kniha-jázd editor while a trip is active. Auto-saves
+            // to the same SQLite row TripDetailScreen edits, so the driver
+            // can fill in tacho pred / purpose / driver right here without
+            // navigating into the trip detail.
+            if (trip.active && TripController.activeRecordId != null) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              TripFieldsEditor(tripId: TripController.activeRecordId!),
             ],
             const SizedBox(height: 16),
             SizedBox(
