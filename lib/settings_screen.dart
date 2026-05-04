@@ -9,8 +9,10 @@ import 'package:autologic_drive/tracking/engine.dart';
 import 'package:autologic_drive/trip/bluetooth_helper.dart';
 import 'package:wakelock_partial_android/wakelock_partial_android.dart';
 
+import 'auth/backend_api.dart';
 import 'l10n/app_localizations.dart';
 import 'preferences.dart';
+import 'screens/set_password_screen.dart';
 import 'server_presets.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -421,6 +423,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: ListView(
         children: [
+          if (BackendApi.isPaired)
+            ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Zmeniť heslo'),
+              subtitle: const Text('Heslo pre webovú aplikáciu Kniha jázd'),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const SetPasswordScreen(skippable: false),
+                  ),
+                );
+              },
+            ),
           _buildLanguageListTile(),
           _buildMinTripDistanceTile(),
           _buildRetentionTile(),

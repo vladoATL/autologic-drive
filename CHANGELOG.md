@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.15.1 — 2026-05-04
+
+### Added
+- **Settings → Zmeniť heslo** — re-uses `SetPasswordScreen(skippable: false)`. Visible only when `BackendApi.isPaired`.
+
 ## 0.15.0 — 2026-05-04
 
 Self-service password setup after pairing.
