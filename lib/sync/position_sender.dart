@@ -116,7 +116,7 @@ class PositionSender {
     if (buf == null || buf.isEmpty) return 0;
     if (!BackendApi.isPaired) return 0;
 
-    final base = Preferences.instance.getString(Preferences.apiUrl);
+    final base = Preferences.instance.getString(Preferences.backendApiUrl);
     final token = Preferences.instance.getString(Preferences.backendAccessToken);
     if (base == null || base.isEmpty || token == null || token.isEmpty) {
       return 0;

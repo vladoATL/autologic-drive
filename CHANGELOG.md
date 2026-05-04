@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.1 — 2026-05-04
+
+Fix: separate `backendApiUrl` preference for the AutoLogic Backend.
+
+- Until now `Preferences.apiUrl` was reused for both Traccar (port 8082) and AutoLogic Backend (port 8080). On the Starlogic preset that meant `BackendApi.pair`, `PositionSender` and `TripSync` were sending to Traccar's admin REST, which doesn't host `/api/v1/auth/*` or `/api/v1/positions` — silent failure.
+- New `Preferences.backendApiUrl` (default `http://autologic.starlogic.net:8080`). `BackendApi._baseUrl`, `PositionSender._flush`, `TripSync.pushPending` now read from it. `apiUrl` keeps its Traccar role.
+- `ServerPreset` gains a `backendApiUrl` field. Existing installs get the new pref seeded on first launch.
+
 ## 0.13.0 — 2026-05-03
 
 Parallel GPS sink to AutoLogic Backend — drives the Web Admin's trip-detail polyline.

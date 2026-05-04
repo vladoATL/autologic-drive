@@ -33,7 +33,7 @@ class BackendApiException implements Exception {
 
 class BackendApi {
   static String get _baseUrl =>
-      Preferences.instance.getString(Preferences.apiUrl) ?? '';
+      Preferences.instance.getString(Preferences.backendApiUrl) ?? '';
 
   static String? get _accessToken {
     final t = Preferences.instance.getString(Preferences.backendAccessToken);

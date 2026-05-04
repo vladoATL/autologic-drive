@@ -26,6 +26,11 @@ class Preferences {
   static const String language = 'language';
   static const String autoDetect = 'auto_detect';
   static const String apiUrl = 'api_url';
+  /// AutoLogic Backend (.NET 10) base URL — separate from Traccar `apiUrl`
+  /// because the two services run on different ports (Traccar admin :8082,
+  /// AutoLogic Backend :8080). Used by `BackendApi`, `PositionSender`
+  /// and `TripSync`.
+  static const String backendApiUrl = 'backend_api_url';
   static const String authCookie = 'auth_cookie';
   static const String authEmail = 'auth_email';
   static const String authUserId = 'auth_user_id';
@@ -98,11 +103,20 @@ class Preferences {
       await instance.setInt(fastestInterval, 30);
       await instance.setString(language, 'sk');
       await instance.setString(apiUrl, kAutoLogicServer.apiUrl);
+      await instance.setString(backendApiUrl, kAutoLogicServer.backendApiUrl);
     }
     // Migration: pre-0.5.0 installs don't have apiUrl seeded.
     final existingApi = instance.getString(apiUrl);
     if (existingApi == null || existingApi.isEmpty) {
       await instance.setString(apiUrl, kAutoLogicServer.apiUrl);
+    }
+    // Migration: pre-0.13.1 installs reused `apiUrl` for the backend; that
+    // pointed at Traccar admin :8082 which doesn't host /api/v1/auth/*.
+    // Seed `backendApiUrl` from the preset so PositionSender / BackendApi
+    // hit :8080.
+    final existingBackend = instance.getString(backendApiUrl);
+    if (existingBackend == null || existingBackend.isEmpty) {
+      await instance.setString(backendApiUrl, kAutoLogicServer.backendApiUrl);
     }
     // Migration: pre-0.8.1 installs had distance=75 / interval=300 which
     // produced jagged Traccar route lines. Bump to the new tighter defaults

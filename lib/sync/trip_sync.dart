@@ -62,7 +62,7 @@ class TripSync {
     }
 
     final url = Uri.parse(
-      '${Preferences.instance.getString(Preferences.apiUrl) ?? ''}/api/v1/trips/sync',
+      '${Preferences.instance.getString(Preferences.backendApiUrl) ?? ''}/api/v1/trips/sync',
     );
     final body = jsonEncode({
       'trips': pending.map(_toDto).toList(),
