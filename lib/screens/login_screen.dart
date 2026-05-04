@@ -14,6 +14,7 @@ import '../auth/traccar_api.dart';
 import '../configuration_service.dart';
 import '../l10n/app_localizations.dart';
 import '../preferences.dart';
+import '../trip/bluetooth_helper.dart';
 import '../trip/vehicle_repository.dart';
 import '../util/app_logger.dart';
 import 'qr_scan_screen.dart';
@@ -120,10 +121,16 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _registerDevice() async {
     final uniqueId = Preferences.instance.getString(Preferences.id);
     if (uniqueId == null) return;
-    // First-login default; superseded by the primary vehicle label as soon
-    // as the driver pairs a vehicle (VehicleRepository.upsert pushes that
-    // name to Traccar) or by an admin rename on the server (pulled below).
-    final name = 'Drive · ${Platform.operatingSystem}';
+    // First-login default — prefer the phone's BT adapter / device name
+    // ("Galaxy S24 Ultra") over the generic "Drive · android" placeholder.
+    // Superseded by the primary vehicle label as soon as the driver pairs
+    // a vehicle (VehicleRepository.upsert pushes that name to Traccar) or
+    // by an admin rename on the server (pulled below).
+    final detected = await BluetoothHelper.deviceLabel();
+    final name = (detected != null && detected.isNotEmpty)
+        ? detected
+        : 'Drive · ${Platform.operatingSystem}';
+    AppLogger.info('Device registration name resolved to "$name" (detected="${detected ?? "null"}")');
     try {
       await TraccarApi.ensureDevice(name: name, uniqueId: uniqueId);
       // If the driver already paired a vehicle in a previous session, push

@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import '../l10n/app_localizations.dart';
 import '../trip/trip_record.dart';
 import '../trip/trip_repository.dart';
+import '../util/address_resolver.dart';
 import '../util/trip_csv_exporter.dart';
 import 'trip_detail_screen.dart';
 
@@ -53,6 +54,35 @@ class _TripsScreenState extends State<TripsScreen> {
       _trips = trips;
       _loading = false;
     });
+    _resolveMissingAddresses(trips);
+  }
+
+  /// Best-effort: resolve any trips that have coords but no cached address.
+  /// Caps concurrency at 5 to stay friendly to the platform Geocoder. Once a
+  /// batch resolves, refreshes the list once.
+  Future<void> _resolveMissingAddresses(List<TripRecord> trips) async {
+    final pending = trips.where((t) =>
+        (t.startAddress == null && t.startLat != null) ||
+        (t.endAddress == null && t.endLat != null)).toList();
+    if (pending.isEmpty) return;
+    var anyResolved = false;
+    for (var i = 0; i < pending.length; i += 5) {
+      final batch = pending.skip(i).take(5);
+      final results = await Future.wait(batch.map((t) async {
+        final updated = await AddressResolver.resolveAndPersist(t);
+        return updated.startAddress != t.startAddress ||
+            updated.endAddress != t.endAddress;
+      }));
+      if (results.any((r) => r)) anyResolved = true;
+    }
+    if (anyResolved && mounted) _load();
+  }
+
+  Future<void> _resolveAllAwait(List<TripRecord> trips) async {
+    for (var i = 0; i < trips.length; i += 5) {
+      final batch = trips.skip(i).take(5);
+      await Future.wait(batch.map(AddressResolver.resolveAndPersist));
+    }
   }
 
   Future<void> _exportThisMonth() async {
@@ -67,7 +97,9 @@ class _TripsScreenState extends State<TripsScreen> {
       );
       return;
     }
-    await TripCsvExporter.shareCsv(trips, monthLabel: '${now.year}-${now.month.toString().padLeft(2, '0')}');
+    await _resolveAllAwait(trips);
+    final fresh = await TripRepository.list(from: from, to: to);
+    await TripCsvExporter.shareCsv(fresh, monthLabel: '${now.year}-${now.month.toString().padLeft(2, '0')}');
   }
 
   Widget _statusBadge(TripRecord t) {
@@ -105,6 +137,17 @@ class _TripsScreenState extends State<TripsScreen> {
     );
   }
 
+  /// Compact `start → end` line, falling back gracefully when one or
+  /// both addresses are missing.
+  String? _addressSummary(TripRecord t) {
+    final start = t.startAddress;
+    final end = t.endAddress;
+    if ((start == null || start.isEmpty) && (end == null || end.isEmpty)) {
+      return null;
+    }
+    return '${start ?? "—"} → ${end ?? "—"}';
+  }
+
   Widget _tripTile(TripRecord t) {
     final fmt = DateFormat('d.M.yyyy HH:mm');
     final dur = t.endedAt?.difference(t.startedAt);
@@ -114,6 +157,7 @@ class _TripsScreenState extends State<TripsScreen> {
             ? '${dur.inHours} h ${dur.inMinutes.remainder(60)} min'
             : '${dur.inMinutes} min');
     final loc = AppLocalizations.of(context)!;
+    final addressLine = _addressSummary(t);
     return Card(
       child: ListTile(
         leading: const Icon(Icons.directions_car_outlined),
@@ -122,6 +166,15 @@ class _TripsScreenState extends State<TripsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(fmt.format(t.startedAt)),
+            if (addressLine != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                addressLine,
+                style: Theme.of(context).textTheme.bodySmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
             const SizedBox(height: 4),
             Row(
               children: [

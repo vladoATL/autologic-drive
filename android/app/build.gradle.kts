@@ -16,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "net.starlogic.autologic.drive"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -69,4 +69,11 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Lifecycle-aware service for CarConnection LiveData observation.
+    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
+    // Android Auto / Automotive OS connection-state detection (no review
+    // needed — we only observe the LiveData, never submit an AA app).
+    implementation("androidx.car.app:app:1.4.0")
+    // NotificationCompat used by MonitorService.
+    implementation("androidx.core:core-ktx:1.13.1")
 }

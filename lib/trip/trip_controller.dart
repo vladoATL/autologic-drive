@@ -5,8 +5,12 @@
 /// only burns GPS / battery while a trip is active.
 library;
 
+import 'dart:math' as math;
+
 import '../location_cache.dart';
 import '../preferences.dart';
+import '../sync/position_sender.dart';
+import '../sync/trip_sync.dart';
 import '../tracking/engine.dart';
 import '../util/app_logger.dart';
 import '../util/notifications.dart';
@@ -128,16 +132,49 @@ class TripController {
     final endLocation = LocationCache.get();
     final recordId = activeRecordId;
     await engine.stop();
+
+    bool dropped = false;
     if (recordId != null) {
       final existing = await TripRepository.findById(recordId);
       if (existing != null) {
-        await TripRepository.update(existing.copyWith(
-          endedAt: DateTime.now(),
-          endLat: endLocation?.latitude,
-          endLng: endLocation?.longitude,
-          // distanceKm sa doplní v Phase 4 keď bude OdometerCapture
-          // — zatiaľ ostáva null.
-        ));
+        final straightLineKm = _straightLineKm(
+          existing.startLat,
+          existing.startLng,
+          endLocation?.latitude,
+          endLocation?.longitude,
+        );
+        final thresholdM = Preferences.instance.getInt(
+              Preferences.minTripDistanceMeters,
+            ) ??
+            Preferences.defaultMinTripDistanceMeters;
+        // Two drop paths:
+        //   1. Distance was measurable AND below threshold (the obvious case)
+        //   2. Distance was NOT measurable (no startLat — Tracelet hadn't
+        //      produced a fix yet) AND the trip was very short. This catches
+        //      BT-flapping ghost trips where the user never actually moved.
+        final shortNoFixDrop = thresholdM > 0 &&
+            straightLineKm == null &&
+            duration != null &&
+            duration.inSeconds < 90;
+        final shortMeasuredDrop = thresholdM > 0 &&
+            straightLineKm != null &&
+            straightLineKm * 1000 < thresholdM;
+        if (shortMeasuredDrop || shortNoFixDrop) {
+          AppLogger.info(
+            'Trip dropped: '
+            '${straightLineKm == null ? "no GPS fix, duration=${duration?.inSeconds}s" : "${(straightLineKm * 1000).toStringAsFixed(0)} m"} '
+            '< threshold $thresholdM m',
+          );
+          await TripRepository.delete(recordId);
+          dropped = true;
+        } else {
+          await TripRepository.update(existing.copyWith(
+            endedAt: DateTime.now(),
+            endLat: endLocation?.latitude,
+            endLng: endLocation?.longitude,
+            distanceKm: straightLineKm,
+          ));
+        }
       }
     }
     final stoppedRecordId = recordId;
@@ -147,10 +184,52 @@ class TripController {
     await Preferences.instance.setString(_kSource, '');
     await Preferences.instance.setString(_kRecordId, '');
     tripState.value = TripSnapshot.idle;
-    AppNotifications.showTripStopped(
-      vehicleLabel: stoppedLabel,
-      duration: duration,
-      tripId: stoppedRecordId,
-    );
+    if (!dropped) {
+      AppNotifications.showTripStopped(
+        vehicleLabel: stoppedLabel,
+        duration: duration,
+        tripId: stoppedRecordId,
+      );
+      // Best-effort flush of GPS waypoints buffered for this trip — the
+      // Web Admin's polyline depends on these. Continues even if it fails.
+      if (stoppedRecordId != null) {
+        PositionSender.flushTrip(stoppedRecordId).catchError((e) {
+          AppLogger.warn('PositionSender flush on stop failed: $e');
+          return 0;
+        });
+      }
+      // Best-effort push to backend. Failures stay queued (synced=0) and the
+      // app-start hook in main.dart will retry on next launch.
+      TripSync.pushPending().catchError((e) {
+        AppLogger.warn('TripSync post-stop push failed: $e');
+        return const TripSyncReport(sent: 0, acknowledged: 0, rejected: 0);
+      });
+    }
+  }
+
+  /// Great-circle distance between two coords in km, or null if either is
+  /// missing. Used both for the min-trip-distance gate and to populate
+  /// `distanceKm` on the saved record (good enough for the odometer-end
+  /// auto-fill in TripDetailScreen).
+  static double? _straightLineKm(
+    double? lat1,
+    double? lng1,
+    double? lat2,
+    double? lng2,
+  ) {
+    if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) {
+      return null;
+    }
+    const earthKm = 6371.0;
+    double rad(double d) => d * math.pi / 180.0;
+    final dLat = rad(lat2 - lat1);
+    final dLng = rad(lng2 - lng1);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(rad(lat1)) *
+            math.cos(rad(lat2)) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthKm * c;
   }
 }

@@ -30,7 +30,7 @@ class TripCsvExporter {
     final timeFmt = DateFormat('HH:mm');
     final buf = StringBuffer(_utf8Bom);
     buf.writeln(
-      'Dátum;Čas štart;Čas cieľ;Vozidlo;Vodič;Účel;Typ;KM;Tacho pred;Tacho po;Štart súradnice;Cieľ súradnice',
+      'Dátum;Čas štart;Čas cieľ;Vozidlo;Vodič;Účel;Typ;KM;Tacho pred;Tacho po;Štart adresa;Cieľ adresa;Štart súradnice;Cieľ súradnice',
     );
     for (final t in trips) {
       final fields = [
@@ -44,6 +44,8 @@ class TripCsvExporter {
         t.distanceKm != null ? t.distanceKm!.toStringAsFixed(1) : '',
         t.odometerStart?.toString() ?? '',
         t.odometerEnd?.toString() ?? '',
+        _escape(t.startAddress),
+        _escape(t.endAddress),
         t.startLat != null && t.startLng != null
             ? '${t.startLat!.toStringAsFixed(5)},${t.startLng!.toStringAsFixed(5)}'
             : '',

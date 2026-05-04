@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 import '../l10n/app_localizations.dart';
 import '../trip/trip_record.dart';
 import '../trip/trip_repository.dart';
+import '../util/address_resolver.dart';
 
 class TripDetailScreen extends StatefulWidget {
   final String tripId;
@@ -24,6 +25,7 @@ class TripDetailScreen extends StatefulWidget {
 class _TripDetailScreenState extends State<TripDetailScreen> {
   TripRecord? _trip;
   bool _loading = true;
+  bool _resolvingAddress = false;
 
   late final TextEditingController _driverCtrl = TextEditingController();
   late final TextEditingController _purposeCtrl = TextEditingController();
@@ -47,9 +49,10 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
   void initState() {
     super.initState();
     _odoStartCtrl.addListener(_maybeFillOdometerEnd);
-    _odoEndCtrl.addListener(() {
-      if (_odoEndCtrl.text.isNotEmpty) _odoEndManuallyEdited = true;
-    });
+    // NOTE: `_odoEndManuallyEdited` is flipped from the TextField.onChanged
+    // handler (user input only), NOT from a controller listener. A listener
+    // would fire when our own auto-fill writes into the controller and
+    // self-poison the flag, freezing future auto-fills.
     _load();
   }
 
@@ -67,7 +70,19 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     }
     _driverCtrl.text = t.driverName ?? '';
     _purposeCtrl.text = t.purpose;
-    _odoStartCtrl.text = t.odometerStart?.toString() ?? '';
+    // Pre-fill Tacho pred from the previous trip's Tacho po (same vehicle).
+    // Only when the current trip doesn't already have its own value typed.
+    int? odoStart = t.odometerStart;
+    if (odoStart == null && t.vehicleMac != null) {
+      final prev = await TripRepository.lastCompletedWithOdoForVehicle(
+        t.vehicleMac!,
+        excludeId: t.id,
+      );
+      if (prev?.odometerEnd != null) {
+        odoStart = prev!.odometerEnd;
+      }
+    }
+    _odoStartCtrl.text = odoStart?.toString() ?? '';
     _odoEndCtrl.text = t.odometerEnd?.toString() ?? '';
     _odoEndManuallyEdited = t.odometerEnd != null;
     _kind = t.kind;
@@ -75,6 +90,21 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
       _trip = t;
       _driverSuggestions = names;
       _loading = false;
+    });
+    _maybeResolveAddresses(t);
+  }
+
+  Future<void> _maybeResolveAddresses(TripRecord t) async {
+    final needsResolve =
+        (t.startAddress == null && t.startLat != null && t.startLng != null) ||
+            (t.endAddress == null && t.endLat != null && t.endLng != null);
+    if (!needsResolve) return;
+    setState(() => _resolvingAddress = true);
+    final updated = await AddressResolver.resolveAndPersist(t);
+    if (!mounted) return;
+    setState(() {
+      _trip = updated;
+      _resolvingAddress = false;
     });
   }
 
@@ -146,6 +176,37 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     Navigator.of(context).pop(true);
   }
 
+  Widget _addressRow({
+    required IconData icon,
+    required String label,
+    required String? address,
+    required bool hasCoords,
+    required AppLocalizations loc,
+  }) {
+    final String value;
+    if (address != null && address.isNotEmpty) {
+      value = address;
+    } else if (_resolvingAddress && hasCoords) {
+      value = loc.tripAddressResolving;
+    } else {
+      value = '—';
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: Theme.of(context).colorScheme.outline),
+        const SizedBox(width: 6),
+        Text('$label: ', style: Theme.of(context).textTheme.bodySmall),
+        Expanded(
+          child: Text(
+            value,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -204,6 +265,22 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                   ),
                   if (t.distanceKm != null)
                     Text('${t.distanceKm!.toStringAsFixed(1)} km'),
+                  const SizedBox(height: 8),
+                  _addressRow(
+                    icon: Icons.trip_origin,
+                    label: loc.tripStartAddress,
+                    address: t.startAddress,
+                    hasCoords: t.startLat != null && t.startLng != null,
+                    loc: loc,
+                  ),
+                  const SizedBox(height: 4),
+                  _addressRow(
+                    icon: Icons.location_on_outlined,
+                    label: loc.tripEndAddress,
+                    address: t.endAddress,
+                    hasCoords: t.endLat != null && t.endLng != null,
+                    loc: loc,
+                  ),
                 ],
               ),
             ),
@@ -298,6 +375,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                     suffixText: 'km',
                   ),
                   keyboardType: TextInputType.number,
+                  onChanged: (_) => _odoEndManuallyEdited = true,
                 ),
               ),
             ],

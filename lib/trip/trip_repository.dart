@@ -16,7 +16,7 @@ import 'trip_record.dart';
 class TripRepository {
   static const _dbName = 'autologic_trips.db';
   static const _table = 'trips';
-  static const _schemaVersion = 1;
+  static const _schemaVersion = 2;
   static const _uuid = Uuid();
 
   static Database? _db;
@@ -54,6 +54,8 @@ class TripRepository {
         start_lng       REAL,
         end_lat         REAL,
         end_lng         REAL,
+        start_address   TEXT,
+        end_address     TEXT,
         distance_km     REAL,
         synced          INTEGER NOT NULL DEFAULT 0
       )
@@ -67,7 +69,10 @@ class TripRepository {
   }
 
   static Future<void> _onUpgrade(Database db, int oldV, int newV) async {
-    // Add migrations here when schema bumps.
+    if (oldV < 2) {
+      await db.execute('ALTER TABLE $_table ADD COLUMN start_address TEXT');
+      await db.execute('ALTER TABLE $_table ADD COLUMN end_address TEXT');
+    }
   }
 
   static String newId() => _uuid.v4();
@@ -146,6 +151,32 @@ class TripRepository {
     return list.length;
   }
 
+  /// Most recent completed trip for the given vehicle MAC that has a
+  /// non-null `odometer_end`. Used by `TripDetailScreen` to pre-fill the
+  /// next trip's `Tacho pred` from the previous trip's `Tacho po`.
+  static Future<TripRecord?> lastCompletedWithOdoForVehicle(
+    String vehicleMac, {
+    String? excludeId,
+  }) async {
+    final db = await _open();
+    final args = <Object?>[vehicleMac];
+    var where =
+        'vehicle_mac = ? AND ended_at IS NOT NULL AND odometer_end IS NOT NULL';
+    if (excludeId != null) {
+      where += ' AND id != ?';
+      args.add(excludeId);
+    }
+    final rows = await db.query(
+      _table,
+      where: where,
+      whereArgs: args,
+      orderBy: 'started_at DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return TripRecord.fromMap(rows.first);
+  }
+
   /// Names that have ever been used as `driver_name` on a trip — for the
   /// driver autocomplete in `TripDetailScreen`. Excludes nulls and empty
   /// strings; returns alphabetised list.
@@ -163,5 +194,25 @@ class TripRepository {
     final db = await _open();
     await db.delete(_table, where: 'id = ?', whereArgs: [id]);
     AppLogger.info('Trip log: delete $id');
+  }
+
+  /// Delete completed trips older than [retentionDays]. Active trips
+  /// (`ended_at IS NULL`) are always kept. Pass a non-positive value to
+  /// disable retention (no-op).
+  static Future<int> purgeOlderThan(int retentionDays) async {
+    if (retentionDays <= 0) return 0;
+    final db = await _open();
+    final cutoff = DateTime.now()
+        .subtract(Duration(days: retentionDays))
+        .millisecondsSinceEpoch;
+    final removed = await db.delete(
+      _table,
+      where: 'ended_at IS NOT NULL AND started_at < ?',
+      whereArgs: [cutoff],
+    );
+    if (removed > 0) {
+      AppLogger.info('Trip log: purged $removed trips older than $retentionDays days');
+    }
+    return removed;
   }
 }

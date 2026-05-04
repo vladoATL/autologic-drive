@@ -76,6 +76,24 @@ class BluetoothWatcher {
     final state = raw['state'] as String?;
     final profile = raw['profile'] as String?;
     if (address == null || state == null) return;
+
+    // MainActivity.onResume sends a synthetic "poll_request" sentinel so the
+    // foreground UI can backstop missed broadcasts.
+    if (state == 'poll_request') {
+      await pollNow();
+      return;
+    }
+
+    // Android Auto / Automotive OS connection from MonitorService — no BT
+    // MAC, just the synthetic "android-auto" address. Treat as a strong
+    // "user is in a vehicle" signal and start a trip with the first
+    // auto-start vehicle if none is already running.
+    if (profile == 'android_auto' && state == 'connected') {
+      AppLogger.info('Android Auto connected — checking for trip-start');
+      await _onAndroidAutoConnected();
+      return;
+    }
+
     final vehicle = VehicleRepository.findByMac(address);
     // Suppress log noise for devices that aren't trip-eligible — unpaired
     // BT (random headphones), or paired-but-autoStart-off (smartBox-style
@@ -84,6 +102,32 @@ class BluetoothWatcher {
       AppLogger.info('BT event: ${vehicle.label} [$address] $state profile=$profile');
     }
     await _handle(address: address, state: state);
+  }
+
+  static Future<void> _onAndroidAutoConnected() async {
+    final autoDetect =
+        Preferences.instance.getBool(Preferences.autoDetect) ?? false;
+    if (!autoDetect) return;
+    if (tripState.value.active) {
+      AppLogger.info('AA connect — trip already active, skip auto-start');
+      return;
+    }
+    // Pick the first paired vehicle flagged for auto-start. Most fleets
+    // will have exactly one; if the driver swaps cars they can re-pair.
+    Vehicle? vehicle;
+    for (final v in VehicleRepository.all()) {
+      if (v.autoStartTrip) {
+        vehicle = v;
+        break;
+      }
+    }
+    AppLogger.info(
+      'AA auto-start: ${vehicle?.label ?? "(no paired vehicle)"}',
+    );
+    await TripController.start(
+      vehicle: vehicle,
+      source: TripTriggerSource.androidAuto,
+    );
   }
 
   static Future<void> _handle({

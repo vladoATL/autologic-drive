@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android < 12 Auto Backup config. Backs up SharedPreferences (so the
+  random Traccar `Preferences.id` device uniqueId, vehicle pairings,
+  language and the local SQLite trip log all survive a reinstall).
+  Excludes the secure-storage flutter_secure_storage backing file
+  (BiometricLogin credentials) — those are device-bound and not
+  meaningful on a different phone.
+-->
+<full-backup-content>
+    <include domain="sharedpref" path="."/>
+    <include domain="database" path="autologic_trips.db"/>
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml"/>
+</full-backup-content>

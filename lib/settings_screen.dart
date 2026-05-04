@@ -6,6 +6,7 @@ import 'package:autologic_drive/main.dart';
 import 'package:autologic_drive/password_service.dart';
 import 'package:autologic_drive/qr_code_screen.dart';
 import 'package:autologic_drive/tracking/engine.dart';
+import 'package:autologic_drive/trip/bluetooth_helper.dart';
 import 'package:wakelock_partial_android/wakelock_partial_android.dart';
 
 import 'l10n/app_localizations.dart';
@@ -258,6 +259,124 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildMinTripDistanceTile() {
+    final loc = AppLocalizations.of(context)!;
+    final value = Preferences.instance.getInt(Preferences.minTripDistanceMeters) ??
+        Preferences.defaultMinTripDistanceMeters;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.straighten),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    loc.settingsMinTripDistanceLabel,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                Text(
+                  loc.settingsMinTripDistanceValue(value),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              loc.settingsMinTripDistanceHint,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            Slider(
+              value: value.toDouble(),
+              min: 0,
+              max: 1000,
+              divisions: 20,
+              label: loc.settingsMinTripDistanceValue(value),
+              onChanged: (v) async {
+                await Preferences.instance.setInt(
+                  Preferences.minTripDistanceMeters,
+                  v.round(),
+                );
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMonitorServiceTile() {
+    final loc = AppLocalizations.of(context)!;
+    final value =
+        Preferences.instance.getBool(Preferences.monitorServiceEnabled) ?? true;
+    return SwitchListTile(
+      secondary: const Icon(Icons.bluetooth_searching_outlined),
+      title: Text(loc.settingsMonitorServiceLabel),
+      subtitle: Text(loc.settingsMonitorServiceHint),
+      value: value,
+      onChanged: (v) async {
+        await Preferences.instance.setBool(Preferences.monitorServiceEnabled, v);
+        if (v) {
+          await BluetoothHelper.startMonitorService();
+        } else {
+          await BluetoothHelper.stopMonitorService();
+        }
+        setState(() {});
+      },
+    );
+  }
+
+  Widget _buildBackendSyncTile() {
+    final loc = AppLocalizations.of(context)!;
+    final value =
+        Preferences.instance.getBool(Preferences.backendSyncEnabled) ?? true;
+    return SwitchListTile(
+      secondary: const Icon(Icons.cloud_sync_outlined),
+      title: Text(loc.settingsBackendSyncLabel),
+      subtitle: Text(loc.settingsBackendSyncHint),
+      value: value,
+      onChanged: (v) async {
+        await Preferences.instance.setBool(Preferences.backendSyncEnabled, v);
+        setState(() {});
+      },
+    );
+  }
+
+  Widget _buildRetentionTile() {
+    final loc = AppLocalizations.of(context)!;
+    final value = Preferences.instance.getInt(Preferences.tripRetentionDays) ??
+        Preferences.defaultTripRetentionDays;
+    final options = <int>[30, 60, 90, 180, 365, Preferences.tripRetentionNever];
+    String labelFor(int days) => days == Preferences.tripRetentionNever
+        ? loc.settingsRetentionNever
+        : loc.settingsRetentionDays(days);
+    return ListTile(
+      leading: const Icon(Icons.delete_sweep_outlined),
+      title: Text(loc.settingsRetentionLabel),
+      subtitle: Text(loc.settingsRetentionHint),
+      trailing: DropdownButton<int>(
+        value: options.contains(value) ? value : Preferences.defaultTripRetentionDays,
+        onChanged: (v) async {
+          if (v == null) return;
+          await Preferences.instance.setInt(Preferences.tripRetentionDays, v);
+          setState(() {});
+        },
+        items: options
+            .map((d) => DropdownMenuItem(value: d, child: Text(labelFor(d))))
+            .toList(),
+      ),
+    );
+  }
+
   Widget _buildAccuracyListTile() {
     final accuracyOptions = ['highest', 'high', 'medium', 'low'];
     return ListTile(
@@ -303,6 +422,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         children: [
           _buildLanguageListTile(),
+          _buildMinTripDistanceTile(),
+          _buildRetentionTile(),
+          _buildBackendSyncTile(),
+          _buildMonitorServiceTile(),
           _buildListTile(AppLocalizations.of(context)!.idLabel, Preferences.id, false),
           _buildUrlListTile(),
           _buildAccuracyListTile(),

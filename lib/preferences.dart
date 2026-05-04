@@ -45,6 +45,8 @@ class Preferences {
   static const int defaultTripRetentionDays = 60;
   /// Sentinel for "never delete" — stored as -1 in the pref.
   static const int tripRetentionNever = -1;
+  static const String backendSyncEnabled = 'backend_sync_enabled';
+  static const String monitorServiceEnabled = 'monitor_service_enabled';
 
   static const String lastTimestamp = 'lastTimestamp';
   static const String lastLatitude = 'lastLatitude';
@@ -70,6 +72,8 @@ class Preferences {
           backendUserId, backendTenantId, backendRole,
           minTripDistanceMeters,
           tripRetentionDays,
+          backendSyncEnabled,
+          monitorServiceEnabled,
           lastTimestamp, lastLatitude, lastLongitude, lastHeading,
           // Trip + vehicles (TripController, VehicleRepository, OsmAndSender):
           'trip_active', 'trip_vehicle_mac', 'trip_started_at', 'trip_source',

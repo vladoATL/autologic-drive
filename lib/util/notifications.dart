@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../preferences.dart';
 import '../screens/trip_detail_screen.dart';
 import 'app_logger.dart';
 
@@ -47,12 +48,18 @@ class AppNotifications {
               AndroidFlutterLocalNotificationsPlugin>();
       await android?.createNotificationChannel(channel);
       // Android 13+ refuses to surface notifications without runtime
-      // permission. The onboarding wizard handles this for new installs;
-      // cover skip-onboarding (or first launch) here as a backstop.
-      final enabled = await android?.areNotificationsEnabled() ?? false;
-      if (!enabled) {
-        final granted = await android?.requestNotificationsPermission();
-        AppLogger.info('Notification permission requested at init: $granted');
+      // permission. The onboarding wizard owns the first-time prompt — only
+      // backstop here if onboarding is already done (returning user, fresh
+      // install with skip-onboarding etc.). Without this guard we fire a
+      // duplicate dialog right before the wizard's Notifications step.
+      final onboardingDone =
+          Preferences.instance.getBool(Preferences.onboardingDone) ?? false;
+      if (onboardingDone) {
+        final enabled = await android?.areNotificationsEnabled() ?? false;
+        if (!enabled) {
+          final granted = await android?.requestNotificationsPermission();
+          AppLogger.info('Notification permission requested at init: $granted');
+        }
       }
     }
     _initialized = true;

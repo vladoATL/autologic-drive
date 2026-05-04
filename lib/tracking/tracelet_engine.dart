@@ -14,6 +14,8 @@ import 'package:tracelet/tracelet.dart' as tl;
 
 import '../geolocation_service.dart' as geo;
 import '../preferences.dart';
+import '../sync/position_sender.dart';
+import '../trip/trip_controller.dart';
 import 'osmand_sender.dart';
 import 'tracking_config.dart';
 import 'tracking_engine.dart';
@@ -83,6 +85,14 @@ class TraceletEngine implements TrackingEngine {
 
   @override
   Future<void> dispatchLocation(TrackedLocation location) async {
+    // Parallel sink: feed the AutoLogic Backend's positions buffer so the
+    // Web Admin can render the real driven polyline. This is independent
+    // of Traccar — failures here never block OsmAndSender below.
+    final activeTrip = TripController.activeRecordId;
+    if (activeTrip != null && activeTrip.isNotEmpty) {
+      PositionSender.enqueue(activeTrip, location);
+    }
+
     final url = Preferences.instance.getString(Preferences.url);
     final id = Preferences.instance.getString(Preferences.id);
     if (url == null || id == null) return;

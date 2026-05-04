@@ -6,7 +6,7 @@ library;
 
 import 'package:flutter/foundation.dart';
 
-enum TripTriggerSource { manual, bluetooth }
+enum TripTriggerSource { manual, bluetooth, androidAuto }
 
 class TripSnapshot {
   final bool active;

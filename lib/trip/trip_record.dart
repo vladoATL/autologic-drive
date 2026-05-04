@@ -27,6 +27,7 @@ class TripRecord {
   final TripTriggerSource source;
 
   final double? startLat, startLng, endLat, endLng;
+  final String? startAddress, endAddress;
   final double? distanceKm;
 
   final bool synced;
@@ -49,6 +50,8 @@ class TripRecord {
     this.startLng,
     this.endLat,
     this.endLng,
+    this.startAddress,
+    this.endAddress,
     this.distanceKm,
     this.synced = false,
   });
@@ -79,6 +82,8 @@ class TripRecord {
     double? startLng,
     double? endLat,
     double? endLng,
+    String? startAddress,
+    String? endAddress,
     double? distanceKm,
     bool? synced,
   }) {
@@ -102,6 +107,8 @@ class TripRecord {
       startLng: startLng ?? this.startLng,
       endLat: endLat ?? this.endLat,
       endLng: endLng ?? this.endLng,
+      startAddress: startAddress ?? this.startAddress,
+      endAddress: endAddress ?? this.endAddress,
       distanceKm: distanceKm ?? this.distanceKm,
       synced: synced ?? this.synced,
     );
@@ -125,6 +132,8 @@ class TripRecord {
         'start_lng': startLng,
         'end_lat': endLat,
         'end_lng': endLng,
+        'start_address': startAddress,
+        'end_address': endAddress,
         'distance_km': distanceKm,
         'synced': synced ? 1 : 0,
       };
@@ -155,6 +164,8 @@ class TripRecord {
         startLng: m['start_lng'] as double?,
         endLat: m['end_lat'] as double?,
         endLng: m['end_lng'] as double?,
+        startAddress: m['start_address'] as String?,
+        endAddress: m['end_address'] as String?,
         distanceKm: m['distance_km'] as double?,
         synced: (m['synced'] as int? ?? 0) == 1,
       );

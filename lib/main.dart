@@ -18,6 +18,8 @@ import 'preferences.dart';
 import 'configuration_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'sync/position_sender.dart';
+import 'sync/trip_sync.dart';
 
 final messengerKey = GlobalKey<ScaffoldMessengerState>();
 final navigatorKey = GlobalKey<NavigatorState>();
@@ -59,6 +61,12 @@ void main() async {
     Preferences.instance.getInt(Preferences.tripRetentionDays) ??
         Preferences.defaultTripRetentionDays,
   ));
+  // Push any trips that didn't reach the backend on stop (offline at the
+  // time, server 5xx, etc.). Idempotent server-side keyed on trip UUID.
+  unawaited(TripSync.pushPending());
+  // Periodic flush of GPS waypoints buffered for active trips (parallel
+  // sink to Traccar; powers the Web Admin's polyline render).
+  PositionSender.start();
   isAuthenticated.value = TraccarApi.isLoggedIn || BackendApi.isPaired;
   needsOnboarding.value =
       !(Preferences.instance.getBool(Preferences.onboardingDone) ?? false);

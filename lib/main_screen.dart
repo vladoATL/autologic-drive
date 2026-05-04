@@ -206,9 +206,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                   const _GpsPulseIndicator(),
                   const SizedBox(width: 8),
                   Text(
-                    trip.source == TripTriggerSource.bluetooth
-                        ? loc.tripSourceBluetooth
-                        : loc.tripSourceManual,
+                    switch (trip.source) {
+                      TripTriggerSource.bluetooth => loc.tripSourceBluetooth,
+                      TripTriggerSource.androidAuto => loc.tripSourceAndroidAuto,
+                      _ => loc.tripSourceManual,
+                    },
                     style: theme.textTheme.bodyMedium,
                   ),
                 ],

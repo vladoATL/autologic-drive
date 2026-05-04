@@ -31,8 +31,6 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-enum _VehicleAction { rename, autoOn, autoOff, unlink }
-
 class _OnboardingScreenState extends State<OnboardingScreen>
     with WidgetsBindingObserver {
   final PageController _pages = PageController();
@@ -107,6 +105,23 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Future<void> _finish() async {
+    // Last-chance: if location was already granted from a previous run, the
+    // user never tapped "Povoliť" so `_requestLocation()` (which also asks
+    // for activity recognition + BLUETOOTH_CONNECT) never fired. Catch
+    // that here so the MonitorService can actually start.
+    final btConnect = await Permission.bluetoothConnect.status;
+    if (!btConnect.isGranted) {
+      final result = await Permission.bluetoothConnect.request();
+      AppLogger.info('Onboarding finish: bluetoothConnect = $result');
+    }
+    final activity = await Permission.activityRecognition.status;
+    if (!activity.isGranted) {
+      final result = await Permission.activityRecognition.request();
+      AppLogger.info('Onboarding finish: activityRecognition = $result');
+    }
+    // Kick the monitor service now that permissions are settled — onResume
+    // of MainActivity will also retry, but this gives an instant start.
+    await BluetoothHelper.startMonitorService();
     await Preferences.instance.setBool(Preferences.autoDetect, _autoDetect);
     await Preferences.instance.setBool(Preferences.onboardingDone, true);
     AppLogger.info('Onboarding completed (autoDetect=$_autoDetect)');
@@ -114,13 +129,46 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Future<void> _requestLocation() async {
-    final result = await [
-      Permission.locationWhenInUse,
-      Permission.locationAlways,
-    ].request();
-    AppLogger.info(
-      'Onboarding: location permissions = ${result.entries.map((e) => "${e.key.toString().split('.').last}=${e.value}").join(", ")}',
-    );
+    // Step 1: foreground permission. On Android < 11 this implicitly also
+    // grants background.
+    final inUse = await Permission.locationWhenInUse.request();
+    AppLogger.info('Onboarding: locationWhenInUse = $inUse');
+
+    if (inUse.isGranted) {
+      // Step 2: background permission. On Android 11+ this opens the system
+      // settings page where the user must pick "Allow all the time" manually.
+      final always = await Permission.locationAlways.request();
+      AppLogger.info('Onboarding: locationAlways = $always');
+
+      // Step 3: activity recognition. Without it, Tracelet's motion detector
+      // can't distinguish driving from idling and trip-start lags badly.
+      final activity = await Permission.activityRecognition.request();
+      AppLogger.info('Onboarding: activityRecognition = $activity');
+
+      // Step 4: BLUETOOTH_CONNECT. Required by Android 14+ before the
+      // background MonitorService can be promoted to foreground for BT
+      // detection. Without it the service crashes at start.
+      final btConnect = await Permission.bluetoothConnect.request();
+      AppLogger.info('Onboarding: bluetoothConnect = $btConnect');
+      if (btConnect.isGranted) {
+        // The service skipped foreground promotion at app launch because
+        // BT permission wasn't yet granted. Kick it off now.
+        await BluetoothHelper.startMonitorService();
+      }
+    }
+
+    // If anything is permanently denied (silent no-op on subsequent
+    // requests), or whileInUse was denied, jump the user straight to the
+    // app's permission page so they can fix it manually.
+    final inUseAfter = await Permission.locationWhenInUse.status;
+    final alwaysAfter = await Permission.locationAlways.status;
+    final needsManual = inUseAfter.isPermanentlyDenied ||
+        inUseAfter.isDenied ||
+        alwaysAfter.isPermanentlyDenied;
+    if (needsManual) {
+      AppLogger.info('Onboarding: falling back to openAppSettings()');
+      await openAppSettings();
+    }
     await _refreshPermissionStatuses();
   }
 
@@ -178,90 +226,94 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     });
   }
 
-  Future<void> _pairAsVehicle(BluetoothDevice device) async {
-    final label = await promptVehicleLabel(
-      context,
-      initial: device.alias ?? device.name ?? device.address,
-    );
-    if (label == null) return;
-    await VehicleRepository.upsert(Vehicle(
-      bluetoothMac: device.address,
-      bluetoothName: device.alias ?? device.name,
-      label: label,
-      autoStartTrip: true,
-    ));
-    AppLogger.info('Onboarding: paired vehicle ${device.address} as $label');
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _editVehicle(BluetoothDevice device, Vehicle existing) async {
+  /// Same fat-Card layout as VehiclesScreen so the onboarding step and the
+  /// in-app Vehicles screen render identically. Toggle ON creates the
+  /// vehicle, edit-icon renames it, "Zrušiť priradenie" removes it.
+  Widget _buildDeviceCard(BluetoothDevice d) {
     final loc = AppLocalizations.of(context)!;
-    final deviceName = device.alias ?? device.name ?? device.address;
-    final action = await showModalBottomSheet<_VehicleAction>(
-      context: context,
-      builder: (ctx) => SafeArea(
+    final existing = VehicleRepository.findByMac(d.address);
+    final vehicle = existing ??
+        Vehicle(
+          bluetoothMac: d.address,
+          bluetoothName: d.alias ?? d.name,
+          label: d.alias ?? d.name ?? d.address,
+        );
+    final paired = existing != null;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    deviceName,
-                    style: Theme.of(context).textTheme.titleMedium,
+            Row(
+              children: [
+                Icon(
+                  paired ? Icons.directions_car : Icons.bluetooth,
+                  color: paired
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.outline,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(vehicle.label,
+                          style: Theme.of(context).textTheme.titleMedium),
+                      Text(d.alias ?? d.name ?? '',
+                          style: Theme.of(context).textTheme.bodySmall),
+                      Text(d.address,
+                          style: Theme.of(context).textTheme.bodySmall),
+                    ],
                   ),
-                  Text(
-                    device.address,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.edit),
-              title: Text(loc.vehicleRenameAction),
-              subtitle: Text(existing.label),
-              onTap: () => Navigator.pop(ctx, _VehicleAction.rename),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () async {
+                    final result = await promptVehicleLabel(
+                      context,
+                      initial: vehicle.label,
+                    );
+                    if (result == null) return;
+                    await VehicleRepository.upsert(
+                      vehicle.copyWith(label: result),
+                    );
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ],
             ),
             SwitchListTile(
-              secondary: const Icon(Icons.auto_awesome),
+              contentPadding: EdgeInsets.zero,
               title: Text(loc.vehicleAutoStartLabel),
-              value: existing.autoStartTrip,
-              onChanged: (v) => Navigator.pop(
-                ctx,
-                v ? _VehicleAction.autoOn : _VehicleAction.autoOff,
+              subtitle: Text(
+                loc.vehicleAutoStartHint,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
+              value: vehicle.autoStartTrip,
+              onChanged: (v) async {
+                await VehicleRepository.upsert(
+                  vehicle.copyWith(autoStartTrip: v),
+                );
+                if (mounted) setState(() {});
+              },
             ),
-            ListTile(
-              leading: Icon(Icons.link_off,
-                  color: Theme.of(context).colorScheme.error),
-              title: Text(loc.vehicleUnlinkButton),
-              onTap: () => Navigator.pop(ctx, _VehicleAction.unlink),
-            ),
+            if (paired)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await VehicleRepository.remove(d.address);
+                    if (mounted) setState(() {});
+                  },
+                  icon: const Icon(Icons.link_off, size: 18),
+                  label: Text(loc.vehicleUnlinkButton),
+                ),
+              ),
           ],
         ),
       ),
     );
-    if (action == null) return;
-    switch (action) {
-      case _VehicleAction.rename:
-        await _pairAsVehicle(device);
-      case _VehicleAction.autoOn:
-        await VehicleRepository.upsert(existing.copyWith(autoStartTrip: true));
-        AppLogger.info('Vehicle ${existing.label} autoStart=true');
-        if (mounted) setState(() {});
-      case _VehicleAction.autoOff:
-        await VehicleRepository.upsert(existing.copyWith(autoStartTrip: false));
-        AppLogger.info('Vehicle ${existing.label} autoStart=false');
-        if (mounted) setState(() {});
-      case _VehicleAction.unlink:
-        await VehicleRepository.remove(existing.bluetoothMac);
-        AppLogger.info('Vehicle ${existing.label} unlinked');
-        if (mounted) setState(() {});
-    }
   }
 
   Widget _stepWelcome() => Padding(
@@ -271,7 +323,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           children: [
             ColorFiltered(
               colorFilter: ColorFilter.mode(
-                Theme.of(context).colorScheme.onSurface,
+                Theme.of(context).colorScheme.primary,
                 BlendMode.srcIn,
               ),
               child: Image.asset(
@@ -432,38 +484,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   )
                 : ListView.builder(
                     itemCount: _pairedDevices.length,
-                    itemBuilder: (_, i) {
-                      final d = _pairedDevices[i];
-                      final existing =
-                          VehicleRepository.findByMac(d.address);
-                      return Card(
-                        child: ListTile(
-                          leading: Icon(existing != null
-                              ? (existing.autoStartTrip
-                                  ? Icons.directions_car
-                                  : Icons.bluetooth_disabled)
-                              : Icons.bluetooth),
-                          title: Text(existing?.label ??
-                              d.alias ??
-                              d.name ??
-                              d.address),
-                          subtitle: Text(
-                            existing != null
-                                ? '${d.address} · ${existing.autoStartTrip ? loc.vehicleAutoStartLabel : loc.vehicleAutoStartOff}'
-                                : d.address,
-                          ),
-                          trailing: existing != null
-                              ? const Icon(Icons.more_vert)
-                              : TextButton(
-                                  onPressed: () => _pairAsVehicle(d),
-                                  child: Text(loc.onboardBtPickButton),
-                                ),
-                          onTap: existing != null
-                              ? () => _editVehicle(d, existing)
-                              : () => _pairAsVehicle(d),
-                        ),
-                      );
-                    },
+                    itemBuilder: (_, i) => _buildDeviceCard(_pairedDevices[i]),
                   ),
           ),
         ],

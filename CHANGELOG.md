@@ -1,5 +1,123 @@
 # Changelog
 
+## 0.13.0 — 2026-05-03
+
+Parallel GPS sink to AutoLogic Backend — drives the Web Admin's trip-detail polyline.
+
+### Added
+- **`PositionSender`** (`lib/sync/position_sender.dart`) — in-memory buffer per active trip id; periodic flush every 30 s plus on-demand flush on trip stop. POSTs to `${backend}/api/v1/positions` (added in `autologic-backend` v0.11.0) with the bearer token already used for `auth/me` and `trips/sync`. Idempotent server-side keyed on the client-generated waypoint UUID.
+- **`TraceletEngine.dispatchLocation`** now feeds each `TrackedLocation` into `PositionSender.enqueue(activeTrip, …)` before handing off to `OsmAndSender`. Failures here never block Traccar — the backend is a parallel sink.
+- **`TripController.stop`** flushes `PositionSender` for the stopped trip before the post-stop `TripSync.pushPending`. The backend ends up with both the trip metadata and its waypoints by the time the Web Admin refreshes.
+- **`main.dart`** starts the periodic flush timer at app init.
+
+### Notes
+- Buffer is **not persisted to SQLite**. App crashes mid-trip lose the in-flight waypoints since the last flush — Traccar still has them. Persistent queueing may land in 0.14.x if real-world usage shows the loss is meaningful.
+- Backend has CORS `:8080 → web:4090` from v0.10.0 and the positions endpoints from v0.11.0; no further server work needed for this release.
+
+## 0.12.0 — 2026-05-03
+
+Background BT + Android Auto detection (the long-awaited "0.9.6" work) —
+trips now auto-start even when the app is dismissed from recents, and
+Android Auto projection acts as a second high-confidence trigger source
+alongside Bluetooth.
+
+### Added
+- **`AutoLogicApplication`** + **`EngineChannels`** singleton — a
+  process-level cached `FlutterEngine` (`FlutterEngineCache` keyed on
+  `autologic_drive_main_engine`). The Dart isolate is initialised once
+  at process start and survives `MainActivity.onDestroy`, so `BluetoothWatcher`
+  keeps receiving connection events when the user has swiped the app away.
+- **`MonitorService`** — always-on foreground service (notification
+  channel `monitor_service`, importance MIN, priority MIN, lockscreen
+  hidden). Hosts the BT broadcast receiver and an
+  `androidx.car.app.connection.CarConnection` observer; both push events
+  through `EngineChannels.emit(...)` to Dart. Started by `MainActivity.onCreate`.
+- **Android Auto** as a trip trigger source. New `TripTriggerSource.androidAuto`
+  enum value; new SK/EN/CS strings (`tripSourceAndroidAuto`). When AA
+  projection comes online and no trip is active, Drive auto-starts a
+  trip with the first paired auto-start vehicle (or anonymous if none).
+- Manifest permissions `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_CONNECTED_DEVICE`,
+  service declaration with `foregroundServiceType="connectedDevice"`.
+- Gradle deps `androidx.lifecycle:lifecycle-service:2.8.7`,
+  `androidx.car.app:app:1.4.0`, `androidx.core:core-ktx:1.13.1`.
+
+### Changed
+- **`MainActivity`** stripped down to: provide cached engine, start
+  `MonitorService`, and replay current BT state on resume via the new
+  `poll_request` sentinel. All channel registration and the BT receiver
+  moved to `EngineChannels` / `MonitorService`.
+- Trip-source label rendering in `MainScreen` now uses a switch
+  expression to render the AA case.
+
+### Notes
+- The persistent monitoring notification is intentionally minimum
+  priority and hidden from the lock screen — visible only when the
+  user pulls down the shade. It's the cost of background detection;
+  Android requires foreground service status for any code that wants
+  to react to BT broadcasts after the activity dies.
+- Trip *stop* still relies on BT disconnect or manual action — AA
+  disconnect is not yet wired as a stop trigger (most users have BT
+  to the same car, which fires the existing stop path). Will revisit
+  if real-world testing shows AA-only sessions stranding running trips.
+- Trip-merging (collapse short BT gaps into one trip — courier use
+  case) is still deferred; tracked in
+  `project_autologic_drive_trip_merging_todo.md` memory.
+
+## 0.11.1 — 2026-05-03
+
+Identity continuity across reinstalls + better Traccar device naming.
+
+### Added
+- **Android Auto Backup** (`android:allowBackup="true"` + `backup_rules.xml`
+  + `data_extraction_rules.xml`). SharedPreferences and the SQLite trip
+  log are backed up to the user's Google account and automatically
+  restored on a fresh install — so the random `Preferences.id` (used as
+  the Traccar device `uniqueId`) survives reinstalls and the same Traccar
+  device continues to receive positions instead of a duplicate appearing.
+  Excludes `flutter_secure_storage` blob (device-bound BiometricLogin
+  credentials are not meaningful on a different phone).
+- **Better default Traccar device name**: registration now uses the
+  phone's BT adapter name (e.g. *"Galaxy S24 Ultra"*) via a new
+  `BluetoothHelper.deviceLabel()` bridge to native Kotlin. Falls back
+  through `Settings.Global.DEVICE_NAME` (Android 12+) and `Build.MODEL`.
+  Replaces the generic *"Drive · android"* placeholder. Still gets
+  superseded by the primary vehicle label once the driver pairs a
+  vehicle (existing behaviour).
+
+### Notes
+- The "stable identity from backend `userId`" approach is still the
+  long-term plan (avoids the random ID drifting at all). It lands in
+  0.12.x once the backend GPS proxy is ready and we control the device
+  registration flow end-to-end. Auto Backup is the interim safety net.
+
+## 0.11.0 — 2026-05-03
+
+Trip-sync to AutoLogic Backend.
+
+### Added
+- **`TripSync`** ([lib/sync/trip_sync.dart](lib/sync/trip_sync.dart)) —
+  pushes completed-but-unsynced trips to `POST /api/v1/trips/sync` on the
+  backend, using the JWT obtained during pair / login. Acked trips flip
+  their local `synced` flag to `true`; rejected ones stay queued and get
+  retried on the next app start. Idempotent server-side on the
+  client-generated trip UUID.
+- **Post-stop hook** in `TripController.stop` calls `TripSync.pushPending()`
+  fire-and-forget once the trip is finalised.
+- **Startup retry** in `main.dart` flushes any trips that didn't reach the
+  backend on stop (offline at the time, transient 5xx).
+- **Settings → Synchronizácia s AutoLogic Backend** toggle (default ON)
+  for users who want to keep the kniha jázd strictly local.
+
+### Notes
+- Backend endpoint `/api/v1/trips/sync` is being implemented in parallel
+  by a separate agent against the spec at
+  `C:\Projects\autologic-backend\docs\drive-integration-status.md`.
+  Until that ships, sync calls will return non-2xx and trips will stay
+  `synced=false` (visible only in CSV / local detail). No user-visible
+  break — every other code path keeps working.
+- The legacy direct Tracelet → Traccar GPS path on port 5055 is unchanged.
+  GPS proxy through backend lands in 0.12.x.
+
 ## 0.10.0 — 2026-05-03
 
 First integration with the AutoLogic Backend (.NET 10) — paves the way for
