@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.2 — 2026-05-04
+
+Hotfix for 0.13.1: `backend_api_url` was missing from the
+`SharedPreferencesWithCacheOptions.allowList`, so `Preferences.init`
+threw `Invalid argument(s): backend_api_url is not included in the
+PreferencesFilter allowlist` and the app froze on the splash screen.
+Added the key to the allowlist.
+
 ## 0.13.1 — 2026-05-04
 
 Fix: separate `backendApiUrl` preference for the AutoLogic Backend.

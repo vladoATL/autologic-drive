@@ -72,7 +72,7 @@ class Preferences {
         allowList: {
           id, url, accuracy, distance, interval, angle, heartbeat,
           fastestInterval, buffer,  wakelock, stopDetection, password, language, autoDetect,
-          apiUrl, authCookie, authEmail, authUserId, driverName, onboardingDone,
+          apiUrl, backendApiUrl, authCookie, authEmail, authUserId, driverName, onboardingDone,
           backendAccessToken, backendRefreshToken, backendAccessExpiresAt,
           backendUserId, backendTenantId, backendRole,
           minTripDistanceMeters,
