@@ -202,6 +202,31 @@ class BackendApi {
     return pair;
   }
 
+  /// Set a password for the currently paired driver so they can log in to
+  /// the Web Admin later. Requires an authenticated session.
+  static Future<void> setPassword(String newPassword) async {
+    final token = await getValidAccessToken();
+    if (token == null) {
+      throw const BackendApiException('Not authenticated', 401);
+    }
+    final url = Uri.parse('$_baseUrl/api/v1/auth/set-password');
+    final resp = await http.post(
+      url,
+      headers: {
+        HttpHeaders.contentTypeHeader: 'application/json',
+        HttpHeaders.authorizationHeader: 'Bearer $token',
+      },
+      body: jsonEncode({'newPassword': newPassword}),
+    );
+    if (resp.statusCode != 204 && resp.statusCode != 200) {
+      throw BackendApiException(
+        resp.body.isNotEmpty ? resp.body : 'set-password failed',
+        resp.statusCode,
+      );
+    }
+    AppLogger.info('Backend set-password OK');
+  }
+
   /// Best-effort logout: revoke the refresh token server-side and clear
   /// local state. Network failures are swallowed (we still wipe locally).
   static Future<void> logout() async {

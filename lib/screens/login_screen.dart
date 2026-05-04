@@ -18,6 +18,7 @@ import '../trip/bluetooth_helper.dart';
 import '../trip/vehicle_repository.dart';
 import '../util/app_logger.dart';
 import 'qr_scan_screen.dart';
+import 'set_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoggedIn;
@@ -168,8 +169,12 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     final paired = await ConfigurationService.applyUri(uri);
     if (paired) {
-      // Backend pair succeeded — driver is authenticated, skip the password
-      // form entirely.
+      // Backend pair succeeded — driver is authenticated. Offer to set a
+      // password for later web-admin login (skippable).
+      if (!mounted) return;
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const SetPasswordScreen()),
+      );
       if (!mounted) return;
       widget.onLoggedIn();
       return;

@@ -18,6 +18,7 @@ import 'preferences.dart';
 import 'configuration_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/set_password_screen.dart';
 import 'sync/position_sender.dart';
 import 'sync/trip_sync.dart';
 
@@ -95,12 +96,26 @@ class _MainAppState extends State<MainApp> {
     final uri = await appLinks.getInitialLink();
     if (uri != null) {
       final paired = await ConfigurationService.applyUri(uri);
-      if (paired) isAuthenticated.value = true;
+      if (paired) {
+        isAuthenticated.value = true;
+        await _promptSetPassword();
+      }
     }
     appLinks.uriLinkStream.listen((uri) async {
       final paired = await ConfigurationService.applyUri(uri);
-      if (paired) isAuthenticated.value = true;
+      if (paired) {
+        isAuthenticated.value = true;
+        await _promptSetPassword();
+      }
     });
+  }
+
+  Future<void> _promptSetPassword() async {
+    final ctx = navigatorKey.currentState?.context;
+    if (ctx == null) return;
+    await navigatorKey.currentState!.push<bool>(
+      MaterialPageRoute(builder: (_) => const SetPasswordScreen()),
+    );
   }
 
   @override

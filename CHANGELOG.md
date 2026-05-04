@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.15.0 — 2026-05-04
+
+Self-service password setup after pairing.
+
+### Added
+- `BackendApi.setPassword(newPassword)` — POST `/api/v1/auth/set-password`
+  on the .NET backend (autologic-backend v0.13.0). Lets the paired driver
+  set/change a password for later web-admin login.
+- `SetPasswordScreen` ([lib/screens/set_password_screen.dart](lib/screens/set_password_screen.dart)) —
+  shown right after a successful QR pairing (skippable). Validates ≥8 chars
+  and that the confirm field matches. Re-usable from Settings later via
+  `skippable: false`.
+- After a successful pair (deep-link in `main.dart` _initLinks, in-app QR
+  scan in `login_screen._scanQr`) the driver lands on `SetPasswordScreen`
+  before reaching the home screen. "Preskočiť" is a no-op — driver can
+  always set the password later.
+
 ## 0.14.0 — 2026-05-04
 
 UX overhaul from the 2026-05-04 morning test (Batch 2).
