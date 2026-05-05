@@ -1,5 +1,110 @@
 # Changelog
 
+## 0.18.0 — 2026-05-05
+
+Last-purpose chips in `TripFieldsEditor`: after a trip ends (or when
+the editor opens for a finished trip), pulls the driver's most-used
+purposes for that destination from `GET /api/v1/trips/last-purpose`
+and renders them as `ActionChip`s above the static presets. Tap fills
+the purpose textbox. Empty list (or auth/network failure) keeps the
+existing preset row only — never blocks.
+
+## 0.17.0 — 2026-05-05
+
+Server URL move to `api.autologic.sk` + UX fixes.
+
+### Changed
+- **`kAutoLogicServer` preset** now points at `api.autologic.sk`
+  (Backend `:8080`, Traccar admin `:8082`, OsmAnd `:5055`) instead of
+  the dev-only `autologic.starlogic.net` hostnames. Cloudflare DNS in
+  front of the new domain runs as DNS-only so the custom Traccar ports
+  are reachable. Old preset name *"AutoLogic (Starlogic)"* renamed to
+  just *"AutoLogic"*.
+- **Auto-migration on startup**: any URL pref that still contains
+  `autologic.starlogic.net` or `localhost` gets rewritten to the
+  matching `api.autologic.sk` URL. Existing installs (and Auto Backup
+  restores into fresh installs) now self-heal without the user having
+  to dig through Settings → Server URL.
+
+### Fixed
+- **Logout flow** flips the auth gate to the `LoginScreen` immediately
+  and runs Traccar / Backend revoke + local clear in the background
+  with a 5 s HTTP timeout. Previously a misconfigured (or blocked)
+  Server URL hung the logout button for two minutes — `Logout` looked
+  unresponsive.
+- **Auto-promote primary BT vehicle** even when multiple bonded BT
+  devices are visible, by filtering out common accessory name
+  patterns (`smartbox`, `obd`, `elm`, `headphone`, `airpods`, `watch`,
+  `band`, `beacon`, …). The phone's actual head-unit is then the
+  unique candidate and gets promoted automatically — driver no longer
+  lands on a Vehicles screen with no radio selected after a reinstall.
+- **`PermissionStatusCard` initState crash**: the inline `_items`
+  initializer dereferenced `AppLocalizations.of(context)` from
+  `initState`, which throws because inherited widgets aren't ready
+  yet. Refactored to top-level `_PermItem` records that resolve
+  labels at build time.
+- **`PermissionStatusCard` auto-hides** when every permission is
+  granted — the home screen no longer carries a "all good" card it
+  can't act on. Card slot moved above the trip card so a denial is
+  the first thing the driver sees on a fresh launch, not buried
+  below other sections.
+
+## 0.16.0 — 2026-05-05
+
+UX features from the 2026-05-05 morning test (Batch 3b).
+
+### Added
+- **`LiveTripDistance`** ([lib/trip/live_trip_distance.dart](lib/trip/live_trip_distance.dart)) —
+  global accumulator for the active trip's driven kilometres. Resets in
+  `TripController.start`, fed by `TraceletEngine.dispatchLocation` on
+  every GPS tick (Haversine sum-of-legs, rejects >10 km outliers from
+  fix-loss). Exposes a `ValueNotifier<double>` for live UI updates.
+- **Live `Tacho po` suggestion in `TripFieldsEditor`.** While a trip is
+  running, the suggested end-odometer keeps ticking up as the driver
+  moves (`Tacho pred + round(LiveTripDistance.km)`). Driver only has
+  to confirm at the end rather than computing the delta. Manual edits
+  still latch the field as for finished trips. `TripController.stop`
+  also persists the live total instead of the start→end straight-line,
+  fixing under-counts on curvy routes.
+- **`PermissionStatusCard`** on `MainScreen` — compact card listing the
+  five Drive-critical Android permissions (location while-in-use,
+  location always, activity recognition, Bluetooth, notifications) with
+  green-check / red-X status. Tapping a denied row requests it (or opens
+  app settings if permanently denied). Re-evaluates on every app resume.
+- **"Hotovo" button** at the bottom of `TripDetailScreen`. Auto-save
+  already persists every edit on an 800 ms debounce — the button is
+  pure navigation (`Navigator.pop`) but gives drivers an explicit "I'm
+  done, go back to home" affordance.
+
+## 0.15.2 — 2026-05-05
+
+Hotfix from the 2026-05-05 morning test (Batch 3a — critical fixes).
+
+### Fixed
+- **App crash on swipe-up + auto-detect.** Tracelet's `LocationService`
+  is a foreground service of type `location`, but our manifest only
+  declared `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_CONNECTED_DEVICE`.
+  Android 14+ throws `SecurityException` at FGS start without the
+  matching `FOREGROUND_SERVICE_LOCATION` permission, killing the app.
+  Visible whenever the user swipe-dismissed Drive and BT/AA then
+  triggered an auto-trip from killed state. Added the missing
+  `<uses-permission>` line.
+- **Duplicate trip records on auto-start race.** `BluetoothWatcher`
+  emits both broadcast events and foreground polls in quick succession;
+  two callers were entering `TripController.start` before
+  `tripState.active` flipped, producing two `Trip log: insert` rows
+  per real trip start (observed: 4–6 ghost records per drive).
+  Added a `_starting` re-entry flag that fast-paths the second caller.
+
+### Added
+- **Session-dead banner on `MainScreen`.** When backend access + refresh
+  tokens are both dead, `BackendApi.sessionDeadNotifier` flips and the
+  home screen shows an `errorContainer`-tinted card *"Backend session
+  vypršala — klikni pre opätovné prihlásenie"*. Tap → `BackendApi.logout()`
+  + `isAuthenticated.value = false`, which routes through the
+  `LoginScreen` / QR-pair flow. Replaces the previous silent damper
+  that just stopped logging 401s.
+
 ## 0.15.1 — 2026-05-04
 
 ### Added

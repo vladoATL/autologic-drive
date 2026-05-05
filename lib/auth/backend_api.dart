@@ -18,6 +18,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../preferences.dart';
@@ -47,11 +48,18 @@ class BackendApi {
   /// Set to `true` once a refresh attempt fails — stops the per-30s flush
   /// loop from spamming hopeless 401s into the log. Cleared on successful
   /// pair / login / refresh.
-  static bool _sessionDead = false;
+  ///
+  /// Also exposed via [sessionDeadNotifier] so the UI can show a "session
+  /// expired, please re-login" banner.
+  static final ValueNotifier<bool> sessionDeadNotifier =
+      ValueNotifier<bool>(false);
+
+  static bool get _sessionDead => sessionDeadNotifier.value;
+  static set _sessionDead(bool v) => sessionDeadNotifier.value = v;
 
   /// True iff a previous refresh attempt failed and we shouldn't keep
   /// hammering the backend until the user logs in again.
-  static bool get isSessionDead => _sessionDead;
+  static bool get isSessionDead => sessionDeadNotifier.value;
 
   /// Return an access token guaranteed not to be expired (within a 30 s
   /// safety margin). Triggers a [refresh] if the stored token is past
@@ -227,6 +235,39 @@ class BackendApi {
     AppLogger.info('Backend set-password OK');
   }
 
+  /// Suggested purposes for a destination, sourced from the driver's own
+  /// trip history within the given radius. Returns an empty list (not null)
+  /// when no past trips match. Errors return [] so the UI never blocks on
+  /// suggestions — the driver can always type the purpose freehand.
+  static Future<List<LastPurposeSuggestion>> lastPurposeSuggestions({
+    required double endLat,
+    required double endLng,
+    int radiusMeters = 200,
+    int take = 5,
+  }) async {
+    final token = await getValidAccessToken();
+    if (token == null) return const [];
+    final url = Uri.parse(
+      '$_baseUrl/api/v1/trips/last-purpose'
+      '?endLat=$endLat&endLng=$endLng'
+      '&radiusMeters=$radiusMeters&take=$take',
+    );
+    try {
+      final resp = await http.get(
+        url,
+        headers: {HttpHeaders.authorizationHeader: 'Bearer $token'},
+      );
+      if (resp.statusCode != 200) return const [];
+      final list = jsonDecode(resp.body) as List<dynamic>;
+      return list
+          .map((e) => LastPurposeSuggestion.fromJson(e as Map<String, dynamic>))
+          .toList(growable: false);
+    } catch (e) {
+      AppLogger.warn('lastPurposeSuggestions failed: $e');
+      return const [];
+    }
+  }
+
   /// Best-effort logout: revoke the refresh token server-side and clear
   /// local state. Network failures are swallowed (we still wipe locally).
   static Future<void> logout() async {
@@ -238,8 +279,10 @@ class BackendApi {
           url,
           headers: _headers(contentType: 'application/json'),
           body: jsonEncode({'refreshToken': rt}),
-        );
+        ).timeout(const Duration(seconds: 5));
       } catch (error) {
+        // Don't block logout on a slow / unreachable backend — local state
+        // gets cleared regardless.
         AppLogger.warn('Backend logout request failed: $error');
       }
     }
@@ -325,4 +368,31 @@ class MeResponse {
       await p.setString(Preferences.driverName, name);
     }
   }
+}
+
+/// One row returned by `GET /api/v1/trips/last-purpose`. The list is already
+/// ordered by frequency on the server.
+class LastPurposeSuggestion {
+  final String purpose;
+  final int count;
+  final DateTime lastUsedAt;
+  final String? sampleEndAddress;
+  final double distanceMeters;
+
+  const LastPurposeSuggestion({
+    required this.purpose,
+    required this.count,
+    required this.lastUsedAt,
+    required this.sampleEndAddress,
+    required this.distanceMeters,
+  });
+
+  factory LastPurposeSuggestion.fromJson(Map<String, dynamic> json) =>
+      LastPurposeSuggestion(
+        purpose: json['purpose'] as String,
+        count: (json['count'] as num).toInt(),
+        lastUsedAt: DateTime.parse(json['lastUsedAt'] as String),
+        sampleEndAddress: json['sampleEndAddress'] as String?,
+        distanceMeters: (json['distanceMeters'] as num).toDouble(),
+      );
 }

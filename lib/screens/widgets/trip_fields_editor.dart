@@ -13,7 +13,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../auth/backend_api.dart';
 import '../../l10n/app_localizations.dart';
+import '../../trip/live_trip_distance.dart';
 import '../../trip/trip_record.dart';
 import '../../trip/trip_repository.dart';
 
@@ -42,6 +44,7 @@ class _TripFieldsEditorState extends State<TripFieldsEditor> {
   TripKind _kind = TripKind.business;
 
   List<String> _driverSuggestions = const [];
+  List<LastPurposeSuggestion> _purposeSuggestions = const [];
   bool _odoEndManuallyEdited = false;
   Timer? _saveTimer;
 
@@ -60,6 +63,10 @@ class _TripFieldsEditorState extends State<TripFieldsEditor> {
   void initState() {
     super.initState();
     _odoStartCtrl.addListener(_maybeFillOdometerEnd);
+    // Live distance updates while a trip is running — refresh the suggested
+    // Tacho po every time the running total ticks. Only meaningful for an
+    // active trip; for a finished one, distanceKm is fixed at stop time.
+    LiveTripDistance.kmNotifier.addListener(_maybeFillOdometerEnd);
     _load();
   }
 
@@ -106,15 +113,32 @@ class _TripFieldsEditorState extends State<TripFieldsEditor> {
       _driverSuggestions = names;
       _loading = false;
     });
+    unawaited(_loadPurposeSuggestions(t));
+  }
+
+  Future<void> _loadPurposeSuggestions(TripRecord t) async {
+    if (t.endLat == null || t.endLng == null) return;
+    final list = await BackendApi.lastPurposeSuggestions(
+      endLat: t.endLat!,
+      endLng: t.endLng!,
+    );
+    if (!mounted) return;
+    setState(() => _purposeSuggestions = list);
   }
 
   void _maybeFillOdometerEnd() {
     if (_odoEndManuallyEdited) return;
     final t = _trip;
-    if (t == null || t.distanceKm == null) return;
+    if (t == null) return;
     final start = int.tryParse(_odoStartCtrl.text.trim());
     if (start == null) return;
-    final suggested = start + t.distanceKm!.round();
+    // Active trip → live odometer accumulator (updates on every GPS tick);
+    // finished trip → the value frozen at stop time on the record.
+    final distanceKm = t.endedAt == null
+        ? LiveTripDistance.km
+        : (t.distanceKm ?? 0.0);
+    if (distanceKm <= 0) return;
+    final suggested = start + distanceKm.round();
     final current = _odoEndCtrl.text;
     final newText = suggested.toString();
     if (current == newText) return;
@@ -155,6 +179,7 @@ class _TripFieldsEditorState extends State<TripFieldsEditor> {
   @override
   void dispose() {
     flush();
+    LiveTripDistance.kmNotifier.removeListener(_maybeFillOdometerEnd);
     _driverCtrl.dispose();
     _purposeCtrl.dispose();
     _odoStartCtrl.dispose();
@@ -218,6 +243,34 @@ class _TripFieldsEditorState extends State<TripFieldsEditor> {
             ),
             onChanged: (_) => _scheduleSave(),
           ),
+          if (_purposeSuggestions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Posledné účely pre toto miesto',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final s in _purposeSuggestions)
+                  ActionChip(
+                    avatar: const Icon(Icons.history, size: 16),
+                    label: Text(
+                      s.count > 1 ? '${s.purpose} · ${s.count}×' : s.purpose,
+                    ),
+                    onPressed: () {
+                      _purposeCtrl.text = s.purpose;
+                      setState(() {});
+                      _scheduleSave();
+                    },
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
