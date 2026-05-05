@@ -1,3 +1,6 @@
+> **⚠️ Archived 2026-05-05**: Projekt pozastavený, ďalej sa nevyvíja.
+> Repozitár ostáva ako referencia pre prípadné nadviazanie alebo opätovné použitie.
+
 # AutoLogic Drive
 
 Mobile GPS tracker pre platformu **Starlogic AutoLogic**. Telefón vodiča funguje ako GPS-zariadenie a posiela polohu na náš Traccar-kompatibilný server `autologic.starlogic.net`.
