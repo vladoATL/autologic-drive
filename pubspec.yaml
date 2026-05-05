@@ -17,7 +17,7 @@ dependencies:
   flutter_blue_classic: ^0.0.5
   permission_handler: ^11.3.1
   local_auth: ^2.3.0
-  flutter_local_notifications: ^17.2.4
+  flutter_local_notifications: ^21.0.0
   sqflite: ^2.3.3
   path: ^1.9.0
   uuid: ^4.5.1
