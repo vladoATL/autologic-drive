@@ -12,11 +12,20 @@ class ServerPreset {
 }
 
 const ServerPreset kAutoLogicServer = ServerPreset(
-  name: 'AutoLogic (Starlogic)',
-  url: 'http://autologic.starlogic.net:5055',
-  apiUrl: 'http://autologic.starlogic.net:8082',
-  backendApiUrl: 'http://autologic.starlogic.net:8080',
+  name: 'AutoLogic',
+  url: 'http://api.autologic.sk:5055',
+  apiUrl: 'http://api.autologic.sk:8082',
+  backendApiUrl: 'http://api.autologic.sk:8080',
 );
+
+/// Pre-0.17.0 preset values, kept around for migration so existing installs
+/// auto-switch when they next start the app.
+const kLegacyAutoLogicHosts = <String>[
+  'autologic.starlogic.net',
+  // localhost was used during dev — also bumped to the new prod host on
+  // upgrade so the user doesn't have to manually fix Settings → Server URL.
+  'localhost',
+];
 
 const List<ServerPreset> kServerPresets = [
   kAutoLogicServer,

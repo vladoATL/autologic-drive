@@ -122,6 +122,23 @@ class Preferences {
     if (existingBackend == null || existingBackend.isEmpty) {
       await instance.setString(backendApiUrl, kAutoLogicServer.backendApiUrl);
     }
+    // Migration: 0.17.0 moved hosts from autologic.starlogic.net (dev) and
+    // localhost (dev-loopback) to the new public api.autologic.sk. Auto
+    // Backup restores the old URLs into fresh installs, so without this
+    // sweep BackendApi / OsmAndSender / TraccarApi keep hitting dead hosts.
+    Future<void> rewriteIfLegacy(String key, String preset) async {
+      final cur = instance.getString(key);
+      if (cur == null || cur.isEmpty) return;
+      for (final legacy in kLegacyAutoLogicHosts) {
+        if (cur.contains(legacy)) {
+          await instance.setString(key, preset);
+          return;
+        }
+      }
+    }
+    await rewriteIfLegacy(url, kAutoLogicServer.url);
+    await rewriteIfLegacy(apiUrl, kAutoLogicServer.apiUrl);
+    await rewriteIfLegacy(backendApiUrl, kAutoLogicServer.backendApiUrl);
     // Migration: pre-0.8.1 installs had distance=75 / interval=300 which
     // produced jagged Traccar route lines. Bump to the new tighter defaults
     // unless the driver intentionally raised them.

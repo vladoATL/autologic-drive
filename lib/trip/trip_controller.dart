@@ -14,6 +14,7 @@ import '../sync/trip_sync.dart';
 import '../tracking/engine.dart';
 import '../util/app_logger.dart';
 import '../util/notifications.dart';
+import 'live_trip_distance.dart';
 import 'trip_record.dart';
 import 'trip_repository.dart';
 import 'trip_state.dart';
@@ -67,11 +68,22 @@ class TripController {
     }
   }
 
+  /// Reentry guard. BluetoothWatcher emits both broadcast events and
+  /// foreground polls in quick succession; without this, two concurrent
+  /// callers can race past the `tripState.active` check and create
+  /// duplicate trip records (observed in the 2026-05-05 test drive).
+  static bool _starting = false;
+
   static Future<void> start({
     Vehicle? vehicle,
     TripTriggerSource source = TripTriggerSource.manual,
   }) async {
-    if (tripState.value.active) return;
+    if (tripState.value.active || _starting) {
+      AppLogger.info('Trip start ignored — already active or starting');
+      return;
+    }
+    _starting = true;
+    LiveTripDistance.resetForTripStart();
     AppLogger.info(
       'Trip start requested (source=${source.name}, vehicle=${vehicle?.label ?? "none"})',
     );
@@ -82,6 +94,7 @@ class TripController {
       await engine.start();
     } catch (error) {
       AppLogger.error('Engine start failed: $error');
+      _starting = false;
       rethrow;
     }
     final now = DateTime.now();
@@ -117,6 +130,7 @@ class TripController {
       vehicleLabel: vehicle?.label,
       tripId: recordId,
     );
+    _starting = false;
   }
 
   static Future<void> stop() async {
@@ -168,11 +182,17 @@ class TripController {
           await TripRepository.delete(recordId);
           dropped = true;
         } else {
+          // Prefer the live (Haversine-summed-per-leg) distance over the
+          // start→end straight-line one — handles curvy routes correctly.
+          // Fall back to straight-line only if Tracelet never produced a
+          // fix during the trip (live === 0 with no points).
+          final liveKm = LiveTripDistance.km;
+          final finalKm = liveKm > 0 ? liveKm : straightLineKm;
           await TripRepository.update(existing.copyWith(
             endedAt: DateTime.now(),
             endLat: endLocation?.latitude,
             endLng: endLocation?.longitude,
-            distanceKm: straightLineKm,
+            distanceKm: finalKm,
           ));
         }
       }

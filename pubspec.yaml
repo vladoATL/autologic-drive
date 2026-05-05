@@ -1,7 +1,7 @@
 name: autologic_drive
 description: "AutoLogic Drive — GPS tracker pre vozový park Starlogic AutoLogic."
 publish_to: 'none'
-version: 0.18.0+31
+version: 0.19.0+32
 
 environment:
   sdk: ^3.7.2

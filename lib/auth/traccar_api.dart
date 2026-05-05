@@ -95,7 +95,9 @@ class TraccarApi {
   static Future<void> logout() async {
     final url = Uri.parse('$_baseUrl/api/session');
     try {
-      await http.delete(url, headers: _headers());
+      await http
+          .delete(url, headers: _headers())
+          .timeout(const Duration(seconds: 5));
     } catch (error) {
       AppLogger.warn('Logout request failed: $error');
     }

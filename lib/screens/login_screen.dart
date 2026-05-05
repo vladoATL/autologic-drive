@@ -9,6 +9,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../auth/backend_api.dart';
 import '../auth/biometric_login.dart';
 import '../auth/traccar_api.dart';
 import '../configuration_service.dart';
@@ -77,7 +78,38 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      await TraccarApi.login(email, password);
+      // Try the AutoLogic Backend first — that's where SetPasswordScreen
+      // writes the password and where the canonical user record lives.
+      // Fall back to legacy Traccar login if backend rejects (e.g. user
+      // never set a backend password, only paired via QR + Traccar email).
+      var backendOk = false;
+      try {
+        await BackendApi.login(email, password);
+        backendOk = true;
+        AppLogger.info('Login: backend login OK, will try Traccar in parallel');
+      } on BackendApiException catch (e) {
+        AppLogger.info('Login: backend rejected ($e), falling back to Traccar');
+      }
+
+      // Try Traccar so OsmAndSender can write positions and the Vehicles
+      // screen can rename the device. Failure here is OK if backend
+      // succeeded — Traccar password may be stale post-`set-password`,
+      // but the device's uniqueId still works on the OsmAnd ingest port
+      // without auth.
+      try {
+        await TraccarApi.login(email, password);
+        AppLogger.info('Login: Traccar login OK');
+      } on TraccarApiException catch (e) {
+        if (!backendOk) {
+          // Both failed — surface the Traccar error verbatim.
+          setState(() => _error = e.statusCode == 401 || e.statusCode == 400
+              ? AppLocalizations.of(context)!.loginBadCredentials
+              : e.message);
+          return;
+        }
+        AppLogger.warn('Login: Traccar rejected after backend OK ($e) — continuing without Traccar cookie');
+      }
+
       if (_rememberMe) {
         await BiometricLogin.save(email: email, password: password);
       } else {
@@ -86,10 +118,6 @@ class _LoginScreenState extends State<LoginScreen> {
       await _registerDevice();
       if (!mounted) return;
       widget.onLoggedIn();
-    } on TraccarApiException catch (e) {
-      setState(() => _error = e.statusCode == 401 || e.statusCode == 400
-          ? AppLocalizations.of(context)!.loginBadCredentials
-          : e.message);
     } catch (error) {
       setState(() => _error = error.toString());
     } finally {

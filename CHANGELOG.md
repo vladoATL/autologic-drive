@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.19.0 — 2026-05-05
+
+Diagnostics, vehicle list, and login polish.
+
+### Added
+- **Permission status card** on MainScreen — shows location (when-in-use + always), activity recognition, Bluetooth and notification permission state at a glance, with a single "Obnoviť" button that re-asks for any that are missing.
+- **Server health card** — pings the configured Backend + Traccar URLs and shows up/down status; helpful when a driver suspects "no jazdy syncing" turns out to be a network or DNS issue.
+- **Session-dead banner** — when the backend refresh fails, MainScreen surfaces a tappable "Backend session vypršala" notice that jumps to login. Trips keep saving locally until re-paired.
+- **Vehicles screen rework** — list view of paired vehicles with their last seen time, allowing quick re-pair / unpair without the QR flow.
+- New "Hotovo" button on `TripDetailScreen` for explicit save-and-back instead of relying on the system back gesture.
+
+### Changed
+- l10n: 13 new strings added to `app_sk.arb`, `app_cs.arb`, `app_en.arb` for the items above.
+- `LoginScreen` autofill hints + small layout tightening for one-handed entry.
+- Server presets: only the `kAutoLogicServer` (api.autologic.sk) preset is exposed by default; legacy localhost / starlogic.net presets remain available via dev menu.
+
 ## 0.18.0 — 2026-05-05
 
 Last-purpose chips in `TripFieldsEditor`: after a trip ends (or when

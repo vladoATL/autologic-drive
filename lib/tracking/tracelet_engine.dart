@@ -15,6 +15,7 @@ import 'package:tracelet/tracelet.dart' as tl;
 import '../geolocation_service.dart' as geo;
 import '../preferences.dart';
 import '../sync/position_sender.dart';
+import '../trip/live_trip_distance.dart';
 import '../trip/trip_controller.dart';
 import 'osmand_sender.dart';
 import 'tracking_config.dart';
@@ -91,6 +92,7 @@ class TraceletEngine implements TrackingEngine {
     final activeTrip = TripController.activeRecordId;
     if (activeTrip != null && activeTrip.isNotEmpty) {
       PositionSender.enqueue(activeTrip, location);
+      LiveTripDistance.addPoint(location.latitude, location.longitude);
     }
 
     final url = Preferences.instance.getString(Preferences.url);

@@ -5,9 +5,12 @@ import 'package:app_links/app_links.dart';
 import 'package:autologic_drive/geolocation_service.dart';
 import 'package:autologic_drive/password_service.dart';
 import 'package:autologic_drive/quick_actions.dart';
+import 'package:autologic_drive/trip/bluetooth_helper.dart';
 import 'package:autologic_drive/trip/bluetooth_watcher.dart';
 import 'package:autologic_drive/trip/trip_controller.dart';
 import 'package:autologic_drive/trip/trip_repository.dart';
+import 'package:autologic_drive/trip/vehicle_repository.dart';
+import 'package:autologic_drive/util/app_logger.dart';
 import 'package:autologic_drive/util/notifications.dart';
 
 import 'auth/backend_api.dart';
@@ -39,6 +42,29 @@ final ValueNotifier<bool> isAuthenticated = ValueNotifier<bool>(false);
 /// from Settings). Pre-checked at startup against `Preferences.onboardingDone`.
 final ValueNotifier<bool> needsOnboarding = ValueNotifier<bool>(false);
 
+/// Re-run device registration for the current `Preferences.id`. Pulls the
+/// label from the primary vehicle if one is set, otherwise falls back to
+/// the BT adapter name (same precedence as `LoginScreen._registerDevice`).
+/// No-op when not logged into Traccar.
+Future<void> _ensureTraccarDevice() async {
+  if (!TraccarApi.isLoggedIn) return;
+  final uniqueId = Preferences.instance.getString(Preferences.id);
+  if (uniqueId == null || uniqueId.isEmpty) return;
+  // Lazy-import via top-level reference to avoid pulling Vehicles into
+  // main.dart's import graph just for this one fallback.
+  String? name;
+  try {
+    name = await BluetoothHelper.deviceLabel();
+  } catch (_) {}
+  name ??= 'Drive · android';
+  try {
+    await TraccarApi.ensureDevice(name: name, uniqueId: uniqueId);
+    await VehicleRepository.pullDeviceNameFromServer();
+  } catch (e) {
+    AppLogger.warn('ensureTraccarDevice on cold-start failed: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Preferences.init();
@@ -68,6 +94,12 @@ void main() async {
   // Push any trips that didn't reach the backend on stop (offline at the
   // time, server 5xx, etc.). Idempotent server-side keyed on trip UUID.
   unawaited(TripSync.pushPending());
+  // Re-confirm Traccar device registration on every cold start. Auto Backup
+  // restores `Preferences.id`, but the matching device record may have been
+  // wiped server-side (admin cleanup, account-renaming, etc.). Without this
+  // OsmAndSender hits HTTP 400 on every position post and trips don't show
+  // up in the Traccar UI.
+  unawaited(_ensureTraccarDevice());
   // Periodic flush of GPS waypoints buffered for active trips (parallel
   // sink to Traccar; powers the Web Admin's polyline render).
   PositionSender.start();

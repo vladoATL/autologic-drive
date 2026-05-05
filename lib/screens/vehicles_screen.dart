@@ -10,6 +10,7 @@ import '../trip/bluetooth_helper.dart';
 import '../trip/vehicle.dart';
 import '../trip/vehicle_label_dialog.dart';
 import '../trip/vehicle_repository.dart';
+import '../util/app_logger.dart';
 
 class VehiclesScreen extends StatefulWidget {
   const VehiclesScreen({super.key});
@@ -50,6 +51,48 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
       return;
     }
     final devices = await BluetoothHelper.bondedDevices();
+    if (!mounted) return;
+    final all = VehicleRepository.all();
+    final hasPrimary = all.any((v) => v.autoStartTrip);
+    AppLogger.info(
+      'Vehicles refresh: bonded=${devices.length} ${devices.map((d) => "${d.alias ?? d.name}/${d.address}").join(",")} '
+      'repoVehicles=${all.length} '
+      'repoAutoStart=${all.where((v) => v.autoStartTrip).map((v) => v.label).join(",")} '
+      'hasPrimary=$hasPrimary',
+    );
+    // Pick a primary auto-start vehicle automatically when there's a clear
+    // candidate. Skip OBD readers and accessories (SmartBox, ELM327, OBDII,
+    // headphones, smart watches, beacons) — those have BT but aren't the
+    // car's head-unit. If after filtering exactly one candidate remains,
+    // promote it.
+    if (!hasPrimary) {
+      final candidates = devices.where((d) {
+        final name = (d.alias ?? d.name ?? '').toLowerCase();
+        const accessoryHints = [
+          'smartbox', 'elm', 'obd', 'obdii', 'headphone', 'headset',
+          'airpods', 'watch', 'band', 'beacon', 'tile', 'tag',
+          'speaker', 'mouse', 'keyboard',
+        ];
+        return !accessoryHints.any(name.contains);
+      }).toList();
+      AppLogger.info(
+        'Vehicles auto-promote: ${candidates.length} candidate(s) after filter '
+        '${candidates.map((d) => d.alias ?? d.name).join(",")}',
+      );
+      if (candidates.length == 1) {
+        final d = candidates.first;
+        if (VehicleRepository.findByMac(d.address) == null) {
+          await VehicleRepository.upsert(Vehicle(
+            bluetoothMac: d.address,
+            bluetoothName: d.alias ?? d.name,
+            label: d.alias ?? d.name ?? d.address,
+          ));
+          AppLogger.info('Vehicles: created Vehicle row for ${d.address}');
+        }
+        await VehicleRepository.setPrimaryAutoStart(d.address);
+        AppLogger.info('Vehicles: auto-promoted ${d.address} as primary');
+      }
+    }
     if (!mounted) return;
     setState(() {
       _paired = devices;

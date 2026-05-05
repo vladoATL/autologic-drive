@@ -14,6 +14,11 @@
          when the user has dismissed the app from recents. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+    <!-- Tracelet's LocationService is FGS type=location. Without this
+         permission Android 14+ throws SecurityException at service start
+         and crashes the whole app — observed when the user swipe-dismissed
+         the app and BT/AA then triggered an auto-trip from killed state. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
 
     <!-- Bluetooth: list paired devices for vehicle pairing UI (Vehicles screen).
          API 31+ uses BLUETOOTH_CONNECT; we mark the scan as not-for-location

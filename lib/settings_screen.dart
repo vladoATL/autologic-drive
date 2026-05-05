@@ -13,6 +13,7 @@ import 'auth/backend_api.dart';
 import 'l10n/app_localizations.dart';
 import 'preferences.dart';
 import 'screens/set_password_screen.dart';
+import 'screens/widgets/server_health_card.dart';
 import 'server_presets.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -443,6 +444,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildMonitorServiceTile(),
           _buildListTile(AppLocalizations.of(context)!.idLabel, Preferences.id, false),
           _buildUrlListTile(),
+          const ServerHealthCard(),
           _buildAccuracyListTile(),
           _buildListTile(AppLocalizations.of(context)!.distanceLabel, Preferences.distance, true),
           if (isHighestAccuracy || Platform.isAndroid && distance == 0)

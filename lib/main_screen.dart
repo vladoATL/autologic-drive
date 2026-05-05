@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:app_settings/app_settings.dart';
@@ -14,6 +15,7 @@ import 'l10n/app_localizations.dart';
 import 'screens/trip_detail_screen.dart';
 import 'screens/trips_screen.dart';
 import 'screens/vehicles_screen.dart';
+import 'screens/widgets/permission_status_card.dart';
 import 'screens/widgets/trip_fields_editor.dart';
 import 'settings_screen.dart';
 import 'status_screen.dart';
@@ -165,6 +167,66 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (await PasswordService.authenticate(context) && mounted) {
       await TripController.stop();
     }
+  }
+
+  /// Persistent banner shown when the backend access + refresh tokens are
+  /// both invalid (e.g. session expired server-side, refresh chain broken).
+  /// Tapping logs out from the backend and opens the login flow so the
+  /// driver can re-pair without digging through the drawer.
+  Widget _buildSessionDeadBanner() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: BackendApi.sessionDeadNotifier,
+      builder: (context, dead, _) {
+        if (!dead) return const SizedBox.shrink();
+        final theme = Theme.of(context);
+        final loc = AppLocalizations.of(context)!;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Material(
+            color: theme.colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () async {
+                await BackendApi.logout();
+                isAuthenticated.value = false;
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_outline,
+                        color: theme.colorScheme.onErrorContainer),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            loc.sessionDeadTitle,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                          ),
+                          Text(
+                            loc.sessionDeadHint,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right,
+                        color: theme.colorScheme.onErrorContainer),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildAutoDetectCard() {
@@ -403,13 +465,27 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               onTap: () async {
+                AppLogger.info('Logout tap — starting');
                 Navigator.pop(context);
+                // Flip the auth gate FIRST so the user lands on the
+                // LoginScreen instantly. Server-side revoke + local prefs
+                // clear happen in the background — they can't block the UI
+                // (a misconfigured Server URL hangs the HTTP DELETE for
+                // seconds, otherwise).
                 if (tripState.value.active) {
                   await TripController.stop();
                 }
-                await TraccarApi.logout();
-                await BackendApi.logout();
                 isAuthenticated.value = false;
+                AppLogger.info('Logout: flipped isAuthenticated=false, clearing sessions in background');
+                unawaited(() async {
+                  try {
+                    await TraccarApi.logout();
+                    await BackendApi.logout();
+                    AppLogger.info('Logout: background session clear complete');
+                  } catch (e) {
+                    AppLogger.warn('Logout: background clear failed: $e');
+                  }
+                }());
               },
             ),
             const Divider(),
@@ -456,6 +532,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
+              _buildSessionDeadBanner(),
+              const PermissionStatusCard(),
               _buildTripCard(trip),
               const SizedBox(height: 16),
               _buildAutoDetectCard(),

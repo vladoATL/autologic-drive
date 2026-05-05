@@ -198,6 +198,19 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           ),
           const SizedBox(height: 16),
           TripFieldsEditor(tripId: widget.tripId),
+          const SizedBox(height: 24),
+          // Auto-save already persists every edit on an 800 ms debounce, so
+          // this button is purely navigation back to home — but drivers
+          // expect a visible "I'm done" confirmation after typing tacho po
+          // and purpose, otherwise it's not obvious the form is saved.
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.check),
+            label: Text(loc.tripDoneButton),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
         ],
       ),
     );
