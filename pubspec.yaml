@@ -23,7 +23,7 @@ dependencies:
   uuid: ^4.5.1
   share_plus: ^10.0.0
   path_provider: ^2.1.4
-  package_info_plus: ^8.0.0
+  package_info_plus: ^9.0.1
   shared_preferences: ^2.5.5
   quick_actions: ^1.1.0
   shared_preferences_android: ^2.4.23
