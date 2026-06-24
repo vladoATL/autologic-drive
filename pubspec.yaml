@@ -14,7 +14,7 @@ dependencies:
   intl: any
   tracelet: ^1.9.1
   http: ^1.2.0
-  flutter_blue_classic: ^0.0.5
+  flutter_blue_classic: ^0.1.0
   permission_handler: ^11.3.1
   local_auth: ^2.3.0
   flutter_local_notifications: ^17.2.4
